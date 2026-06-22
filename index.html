@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f23; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        h1 { margin: 20px 0; font-size: 1.8rem; color: #00d4ff; }
+        .container { max-width: 800px; width: 100%; }
+        .status-card { background: #1a1a3e; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .status-card h2 { font-size: 1.1rem; margin-bottom: 15px; color: #888; }
+        .permission-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #2a2a5e; }
+        .permission-row:last-child { border-bottom: none; }
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .badge.waiting { background: #3a3a5e; color: #aaa; }
+        .badge.granted { background: #00c853; color: #fff; }
+        .badge.denied { background: #ff1744; color: #fff; }
+        .badge.error { background: #ff9100; color: #fff; }
+        #map { height: 350px; border-radius: 12px; margin-top: 10px; display: none; }
+        #video { width: 100%; max-width: 400px; border-radius: 12px; display: none; margin-top: 10px; }
+        .coords { font-size: 0.9rem; color: #aaa; margin-top: 10px; font-family: monospace; }
+        .btn-retry { background: #00d4ff; color: #0f0f23; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 15px; font-size: 0.9rem; }
+        .btn-retry:hover { background: #00b8e6; }
+        .hidden { display: none; }
+        .error-msg { color: #ff9100; margin-top: 8px; font-size: 0.9rem; }
+        .info-box { background: #1a1a3e; border-radius: 12px; padding: 20px; margin-bottom: 20px; font-size: 0.85rem; line-height: 1.6; color: #ccc; }
+        .info-box strong { color: #00d4ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Live Tracker</h1>
+
+        <div class="info-box">
+            <strong>Izin diperlukan:</strong> Website ini membutuhkan akses lokasi dan kamera.
+            Ketika browser meminta izin, klik <strong>"Izinkan"</strong> / <strong>"Allow"</strong>.
+        </div>
+
+        <div class="status-card">
+            <h2>Status Izin</h2>
+            <div class="permission-row">
+                <span>Lokasi (GPS)</span>
+                <span class="badge waiting" id="locBadge">Menunggu</span>
+            </div>
+            <div class="permission-row">
+                <span>Kamera</span>
+                <span class="badge waiting" id="camBadge">Menunggu</span>
+            </div>
+        </div>
+
+        <div class="status-card" id="locationCard">
+            <h2>Lokasi Real-time</h2>
+            <div id="map"></div>
+            <div class="coords" id="coords">-</div>
+            <div class="error-msg hidden" id="locError"></div>
+        </div>
+
+        <div class="status-card" id="cameraCard">
+            <h2>Kamera</h2>
+            <video id="video" autoplay playsinline></video>
+            <div class="error-msg hidden" id="camError"></div>
+        </div>
+
+        <button class="btn-retry hidden" id="retryBtn" onclick="startTracking()">Coba Lagi</button>
+    </div>
+
+    <script>
+        let watchId = null;
+        let stream = null;
+        let map = null;
+        let marker = null;
+
+        function showError(elementId, msg) {
+            const el = document.getElementById(elementId);
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        function hideError(elementId) {
+            document.getElementById(elementId).classList.add('hidden');
+        }
+
+        function setBadge(id, status) {
+            const el = document.getElementById(id);
+            el.className = 'badge ' + status;
+            const labels = { waiting: 'Menunggu', granted: 'Diizinkan', denied: 'Ditolak', error: 'Error' };
+            el.textContent = labels[status] || status;
+        }
+
+        function initMap(lat, lng) {
+            const mapEl = document.getElementById('map');
+            mapEl.style.display = 'block';
+
+            if (typeof L !== 'undefined') {
+                if (!map) {
+                    map = L.map('map').setView([lat, lng], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '© OpenStreetMap'
+                    }).addTo(map);
+                }
+                if (marker) map.removeLayer(marker);
+                marker = L.marker([lat, lng]).addTo(map);
+                map.setView([lat, lng], 15);
+            }
+        }
+
+        function requestLocation() {
+            hideError('locError');
+            setBadge('locBadge', 'waiting');
+
+            if (!navigator.geolocation) {
+                setBadge('locBadge', 'error');
+                showError('locError', 'Geolocation tidak didukung browser ini.');
+                return;
+            }
+
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    setBadge('locBadge', 'granted');
+                    const { latitude, longitude, accuracy } = pos.coords;
+                    document.getElementById('coords').textContent =
+                        `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} | Akurasi: ${accuracy.toFixed(0)}m`;
+
+                    initMap(latitude, longitude);
+                },
+                (err) => {
+                    if (err.code === 1) {
+                        setBadge('locBadge', 'denied');
+                        showError('locError', 'Izin lokasi ditolak. Izinkan akses lokasi di pengaturan browser.');
+                    } else if (err.code === 2) {
+                        showError('locError', 'Posisi tidak tersedia. Coba di luar ruangan.');
+                        setBadge('locBadge', 'error');
+                    } else if (err.code === 3) {
+                        showError('locError', 'Waktu permintaan lokasi habis. Coba lagi.');
+                        setBadge('locBadge', 'error');
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        }
+
+        function requestCamera() {
+            hideError('camError');
+            setBadge('camBadge', 'waiting');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setBadge('camBadge', 'error');
+                showError('camError', 'Kamera tidak didukung browser ini.');
+                return;
+            }
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+                .then((s) => {
+                    stream = s;
+                    setBadge('camBadge', 'granted');
+                    const video = document.getElementById('video');
+                    video.srcObject = s;
+                    video.style.display = 'block';
+                })
+                .catch((err) => {
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        setBadge('camBadge', 'denied');
+                        showError('camError', 'Izin kamera ditolak. Izinkan akses kamera di pengaturan browser.');
+                    } else if (err.name === 'NotFoundError') {
+                        setBadge('camBadge', 'error');
+                        showError('camError', 'Kamera tidak ditemukan di device ini.');
+                    } else {
+                        setBadge('camBadge', 'error');
+                        showError('camError', 'Gagal akses kamera: ' + err.message);
+                    }
+                });
+        }
+
+        function startTracking() {
+            document.getElementById('retryBtn').classList.add('hidden');
+            requestLocation();
+            requestCamera();
+        }
+
+        window.addEventListener('load', () => {
+            setTimeout(startTracking, 500);
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            if (stream) stream.getTracks().forEach(t => t.stop());
+        });
+    </script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</body>
+</html>
