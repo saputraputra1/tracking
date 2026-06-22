@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login — Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; background:#0a0a1a; color:#fff; }
+        .login-card { background:#12122a; border:1px solid #1e1e3e; border-radius:16px; padding:40px; width:100%; max-width:380px; }
+        .login-card h1 { font-size:1.3rem; font-weight:700; text-align:center; margin-bottom:6px; color:#00d4ff; }
+        .login-card p { text-align:center; color:#5a5a7e; font-size:.82rem; margin-bottom:28px; }
+        .input-group { margin-bottom:18px; }
+        .input-group label { display:block; font-size:.75rem; font-weight:600; color:#8a8aaa; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+        .input-group input { width:100%; padding:12px 14px; border-radius:10px; border:1px solid #1e1e3e; background:#0f0f25; color:#fff; font-size:.9rem; outline:none; transition:border .3s; font-family:inherit; }
+        .input-group input:focus { border-color:#00d4ff; }
+        .btn { width:100%; padding:13px; border:none; border-radius:10px; background:linear-gradient(135deg,#00d4ff,#7c3aed); color:#fff; font-size:.9rem; font-weight:600; cursor:pointer; font-family:inherit; transition:all .3s; }
+        .btn:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,212,255,0.2); }
+        .btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+        .error-msg { color:#ff6b6b; font-size:.82rem; text-align:center; margin-top:12px; display:none; }
+        .footer { text-align:center; margin-top:20px; font-size:.75rem; color:#4a4a6e; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>🔐 Admin Panel</h1>
+        <p>Masukkan password untuk mengakses</p>
+        <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="passInput" placeholder="password" onkeydown="if(event.key==='Enter')login()">
+        </div>
+        <button class="btn" id="loginBtn" onclick="login()">Masuk</button>
+        <div class="error-msg" id="errorMsg">Password salah</div>
+        <div class="footer">Live Tracker v1.0</div>
+    </div>
+    <script src="/config.js"></script>
+    <script>
+        function login() {
+            const btn = document.getElementById('loginBtn');
+            const pass = document.getElementById('passInput').value.trim();
+            const err = document.getElementById('errorMsg');
+            if (!pass) { err.textContent='Masukkan password'; err.style.display='block'; return; }
+            btn.disabled = true; btn.textContent = 'Memverifikasi...';
+            fetch(SERVER_URL + '/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pass })
+            }).then(r => r.json()).then(d => {
+                if (d.ok && d.token) {
+                    window.location.href = '/admin.html?token=' + d.token;
+                } else {
+                    err.textContent='Password salah'; err.style.display='block';
+                    btn.disabled = false; btn.textContent = 'Masuk';
+                }
+            }).catch(() => {
+                err.textContent='Gagal terhubung ke server'; err.style.display='block';
+                btn.disabled = false; btn.textContent = 'Masuk';
+            });
+        }
+        fetch(SERVER_URL + '/api/admin/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:''}) }).catch(()=>{});
+    </script>
+</body>
+</html>
