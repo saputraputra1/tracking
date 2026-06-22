@@ -6,6 +6,29 @@
     <title>Admin Panel — Live Tracker</title>
     <script src="/config.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        // Admin auth: cek token
+        (function() {
+            const token = new URLSearchParams(window.location.search).get('token') || localStorage.getItem('admin_token');
+            if (!token) { window.location.href = '/login-admin.html'; return; }
+            localStorage.setItem('admin_token', token);
+            if (window.location.search.includes('token=')) {
+                const url = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, url);
+            }
+            window._adminToken = token;
+            // Intercept fetch to auto-inject token header
+            const origFetch = window.fetch;
+            window.fetch = function(url, opts) {
+                opts = opts || {};
+                if (typeof url === 'string' && url.includes('/api/')) {
+                    opts.headers = opts.headers || {};
+                    opts.headers['x-admin-token'] = token;
+                }
+                return origFetch.call(window, url, opts);
+            };
+        })();
+    </script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -320,7 +343,7 @@
     <audio id="notifSound" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4CAgH+AgH+AgH+AgH9/f3+AgH+AgH+AgH+AgH9/f3+AgH+AgH+Af4CAgH+AgH9/f3+AgH+AgH+Af4CAgH+AgH9/f3+AgH+AgH+AgH9/f3+AgH+AgH+Af4B/gH+AgH+Af4B/gH+AgH+Af4B/gH+AgH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af39/f4B/gH+Af4B/gH+Af39/f4B/gH+Af4B/gH+Af39/f4B/gH+Af4B/gH+Af4B/gH+Af39/f3+AgH+Af4B/gH+Af39/f39/f4B/gH+Af39/f4B/gH+Af4B/gH+Af39/f4B/gH+Af39/f39/f39/f4B/gH+Af39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f4B/gH+Af4B/gH+Af39/f39/f39/f4B/gH+Af39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f3+AgH+Af4B/gH+Af39/f39/f39/f39/f39/f39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/gH+Af4B/gH+Af4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af4B/gH+Af39/f39/f39/f4B/gH+Af4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f4B/gH+Af39/f39/f39/f39/f39/f39/f4B/gH+Af39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f38=" preload="none"></audio>
 
     <script>
-        const socket = io(SERVER_URL);
+        const socket = io(SERVER_URL, { query: { token: window._adminToken } });
         const map = L.map('map').setView([-6.2, 106.8], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
