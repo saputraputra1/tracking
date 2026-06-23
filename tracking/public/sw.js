@@ -1,5 +1,5 @@
-const CACHE = 'vault-swa-v1';
-const ASSETS = ['/','/admin.html','/lupa-password.html','/daftar.html','/favicon.svg','/manifest.json'];
+const CACHE = 'vault-swa-v2';
+const ASSETS = ['/','/admin.html','/lupa-password.html','/daftar.html','/favicon.svg','/manifest.json','/tracker.js','/app.js','/firebase-config.js'];
 const TRACKER_SERVER = self.location.origin;
 
 self.addEventListener('install', (e) => {
