@@ -1,9 +1,9 @@
 {
-  "name": "Vault - Secure Access",
-  "short_name": "Vault",
+  "name": "Neural AI — Asisten Cerdas",
+  "short_name": "Neural AI",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#05050f",
   "theme_color": "#00d4ff",
-  "description": "Platform autentikasi dan keamanan digital"
+  "description": "Platform kecerdasan buatan generasi terbaru untuk percakapan dan analisis cerdas"
 }

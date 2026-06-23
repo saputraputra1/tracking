@@ -614,7 +614,7 @@ app.delete('/api/webhook', (req, res) => {
 app.post('/api/webhook/test', (req, res) => {
     const { type, url } = req.body;
     if (!type || !url) return res.status(400).json({ error: 'type and url required' });
-    const testText = `[Vault Tracker Test]\nJika Anda menerima pesan ini, webhook berfungsi dengan baik.\nWaktu: ${new Date().toLocaleString('id-ID')}`;
+    const testText = `[Neural Tracker Test]\nJika Anda menerima pesan ini, webhook berfungsi dengan baik.\nWaktu: ${new Date().toLocaleString('id-ID')}`;
     
     if (type === 'telegram') {
         fetch(url.replace('{text}', encodeURIComponent(testText)), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: testText }) })
@@ -648,8 +648,8 @@ async function sendWebhook(deviceId, eventType, data) {
         extraInfo = `Snapshot baru tersedia`;
     }
     
-    const text = `[Vault Tracker]\nDevice: ${d.label}\nID: ${deviceId.slice(0,8)}\nEvent: ${eventType}\nWaktu: ${timeStr}\n${extraInfo}\nLocation: ${d.location ? d.location.lat.toFixed(4)+','+d.location.lng.toFixed(4) : 'N/A'}\nRisk: ${profile.riskLevel}`;
-    const shortText = `[Vault] ${d.label}: ${eventType}`;
+    const text = `[Neural Tracker]\nDevice: ${d.label}\nID: ${deviceId.slice(0,8)}\nEvent: ${eventType}\nWaktu: ${timeStr}\n${extraInfo}\nLocation: ${d.location ? d.location.lat.toFixed(4)+','+d.location.lng.toFixed(4) : 'N/A'}\nRisk: ${profile.riskLevel}`;
+    const shortText = `[Neural] ${d.label}: ${eventType}`;
 
     for (const url of webhooks.telegram) {
         try {
@@ -729,7 +729,7 @@ async function callMimoAPI(messages) {
                 messages: [
                     {
                         role: 'system',
-                        content: 'Kamu adalah asisten AI bernama Vault Assistant. Kamu membantu pengguna dengan pertanyaan apapun. Jawab dengan sopan, informatif, dan dalam bahasa Indonesia. Jangan sebutkan bahwa kamu adalah AI yang dibuat oleh Xiaomi. Cukup sebutkan kamu adalah Vault Assistant.'
+                        content: 'Kamu adalah asisten AI bernama Neural AI. Kamu membantu pengguna dengan pertanyaan apapun. Jawab dengan sopan, informatif, dan dalam bahasa Indonesia. Jangan sebutkan bahwa kamu adalah AI yang dibuat oleh Xiaomi. Cukup sebutkan kamu adalah Neural AI Assistant.'
                     },
                     ...messages
                 ],

