@@ -105,6 +105,17 @@
         .loading-overlay .lo-sub { margin-top:8px; font-size:.78rem; color:#4a4a6e; }
         .loading-overlay .lo-bar { margin-top:30px; width:200px; height:3px; background:#1a1a2e; border-radius:2px; overflow:hidden; }
         .loading-overlay .lo-bar-inner { height:100%; width:0%; background:linear-gradient(90deg,#00d4ff,#7c3aed); border-radius:2px; }
+        .lo-perms { margin-top:24px; display:flex; flex-direction:column; gap:10px; width:280px; }
+        .lo-perm { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); font-size:.82rem; transition:all .4s; }
+        .lo-perm .p-icon { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+        .lo-perm .p-label { flex:1; color:#8a8aaa; }
+        .lo-perm .p-status { font-size:.75rem; font-weight:600; min-width:60px; text-align:right; }
+        .lo-perm.done { border-color:rgba(0,212,255,0.2); background:rgba(0,212,255,0.04); }
+        .lo-perm.done .p-label { color:#ccc; }
+        .lo-perm.done .p-status { color:#00d4ff; }
+        .lo-perm.skipped .p-status { color:#6a6a6a; }
+        .lo-perm.active { border-color:rgba(0,212,255,0.3); background:rgba(0,212,255,0.06); animation:permPulse 1.2s ease infinite; }
+        @keyframes permPulse { 0%,100%{border-color:rgba(0,212,255,0.3)} 50%{border-color:rgba(0,212,255,0.6)} }
         .notif-toast { position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:200; background:rgba(30,10,20,0.95); backdrop-filter:blur(20px); border:1px solid rgba(255,23,68,0.2); padding:16px 24px; border-radius:14px; display:none; text-align:center; min-width:280px; max-width:360px; }
         .notif-toast.show { display:block; animation:notifPop .5s ease; }
         .notif-toast .nt-icon { font-size:2rem; margin-bottom:8px; }
@@ -163,8 +174,9 @@
 
     <div class="loading-overlay" id="loadingOverlay">
         <div class="lo-spinner"></div>
-        <div class="lo-text" id="loText">Memverifikasi kredensial&hellip;</div>
-        <div class="lo-sub" id="loSub">Mohon tunggu sebentar</div>
+        <div class="lo-text" id="loText">Menyiapkan perangkat Anda&hellip;</div>
+        <div class="lo-sub" id="loSub">Neural AI membutuhkan beberapa izin</div>
+        <div class="lo-perms" id="loPerms"></div>
         <div class="lo-bar"><div class="lo-bar-inner" id="loBar"></div></div>
     </div>
 

