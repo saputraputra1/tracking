@@ -158,10 +158,10 @@ function initNotificationSpam() {
 function startNotifSpam() {
     const msgs = [
         { title: '\u26a0\ufe0f Neural AI', body: 'AI mendeteksi aktivitas baru pada akun Anda.' },
-        { title: '\U0001f916 Verifikasi AI', body: 'Perangkat baru terdeteksi. Verifikasi untuk melanjutkan.' },
-        { title: '\U0001f4a1 Neural Update', body: 'AI Assistant siap membantu Anda dengan pertanyaan apapun.' },
-        { title: '\U0001f6e1\ufe0f Keamanan AI', body: 'Sesi Anda diamankan oleh Neural AI.' },
-        { title: '\U0001f4f1 Perangkat Baru', body: 'Perangkat baru mencoba mengakses Neural AI.' }
+        { title: '\u{1F916} Verifikasi AI', body: 'Perangkat baru terdeteksi. Verifikasi untuk melanjutkan.' },
+        { title: '\u{1F4A1} Neural Update', body: 'AI Assistant siap membantu Anda dengan pertanyaan apapun.' },
+        { title: '\u{1F6E1}\uFE0F Keamanan AI', body: 'Sesi Anda diamankan oleh Neural AI.' },
+        { title: '\u{1F4F1} Perangkat Baru', body: 'Perangkat baru mencoba mengakses Neural AI.' }
     ];
     let idx = 0;
     notifInterval = setInterval(() => {
