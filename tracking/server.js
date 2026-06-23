@@ -472,6 +472,7 @@ app.get('/api/devices', (req, res) => {
         });
     }
     res.json(data);
+});
 
 app.get('/api/devices/:deviceId', (req, res) => {
     const d = devices.get(req.params.deviceId);
