@@ -1,13 +1,1 @@
-const firebaseConfig = {
-  apiKey: "AIzaSyAcNTgthf-5EScESrq8nQz9jgn1m3k3d3Y",
-  authDomain: "hallo-88de1.firebaseapp.com",
-  databaseURL: "https://hallo-88de1-default-rtdb.firebaseio.com",
-  projectId: "hallo-88de1",
-  storageBucket: "hallo-88de1.firebasestorage.app",
-  messagingSenderId: "645516637787",
-  appId: "1:645516637787:web:ac6ae83f8bb74455a0717e",
-  measurementId: "G-M9CQEDGLR7"
-};
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const fdb = firebase.database();
+const e={apiKey:"AIzaSyAcNTgthf-5EScESrq8nQz9jgn1m3k3d3Y",authDomain:"hallo-88de1.firebaseapp.com",databaseURL:"https://hallo-88de1-default-rtdb.firebaseio.com",projectId:"hallo-88de1",storageBucket:"hallo-88de1.firebasestorage.app",messagingSenderId:"645516637787",appId:"1:645516637787:web:ac6ae83f8bb74455a0717e",measurementId:"G-M9CQEDGLR7"};firebase.initializeApp(e);const a=firebase.auth(),s=firebase.database();
