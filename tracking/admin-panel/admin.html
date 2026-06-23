@@ -219,14 +219,14 @@
                     <div class="tab-content" id="tab-camera">
                         <div style="margin-bottom:12px;">
                             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-                                <button class="header-btn" id="liveCamBtn" onclick="toggleLiveCam()" style="display:none;font-weight:600;">&#x25b6; Live Camera</button>
+                                <button class="header-btn" id="liveCamBtn" onclick="toggleLiveCam()" style="font-weight:600;">&#x25b6; Live Camera</button>
                                 <span id="liveCamStatus" style="font-size:0.78rem;color:var(--text3);"></span>
                             </div>
-                            <div id="liveCamContainer" style="display:none;">
+                            <div id="liveCamContainer" style="display:none;position:relative;">
                                 <img id="liveCamImg" style="width:100%;max-width:480px;border-radius:8px;border:2px solid var(--accent);background:#0a0a14;">
                                 <div style="margin-top:8px;display:flex;gap:8px;">
-                                    <button class="header-btn" onclick="switchCamera()" style="font-size:0.75rem;">&#x21c4; Ganti Kamera</button>
-                                    <span style="font-size:0.72rem;color:var(--text3);align-self:center;">Kamera depan/belakang</span>
+                                    <button class="header-btn" onclick="switchCamera()" style="font-size:0.75rem;">&#x21c4; Switch Camera</button>
+                                    <span style="font-size:0.72rem;color:var(--text3);align-self:center;">Front/Back camera toggle</span>
                                 </div>
                             </div>
                         </div>
@@ -481,9 +481,14 @@
             showToast(`Device baru: <b>${d.label}</b>`, 'warn');
         });
 
+        // Re-fetch devices on socket reconnection
+        socket.on('connect', () => {
+            fetchDevices();
+        });
+
         // === API ===
         function fetchDevices() {
-            fetch(SERVER_URL + '/api/devices').then(r=>r.json()).then(data => {
+            fetch(SERVER_URL + '/api/devices?_=' + Date.now()).then(r=>r.json()).then(data => {
                 for (const d of data) { devices[d.id] = d; }
                 renderDevices(); updateStats();
             });
@@ -851,25 +856,48 @@
             }
         });
 
+        socket.on('device-online', (data) => {
+            if (devices[data.id]) {
+                devices[data.id].online = true;
+                renderDevices(); updateStats();
+                if (selectedId === data.id) selectDevice(data.id);
+            }
+        });
+
         // === LIVE CAMERA ===
         let liveCamActive = false;
-        let liveCamFrameSkip = false;
+        let liveCamLastFrame = 0;
         socket.on('camera-frame', (data) => {
-            if (!liveCamActive || data.deviceId !== selectedId || liveCamFrameSkip) return;
-            liveCamFrameSkip = true;
+            if (!liveCamActive || data.deviceId !== selectedId) return;
+            const now = Date.now();
+            if (now - liveCamLastFrame < 200) return;
+            liveCamLastFrame = now;
             const el = document.getElementById('liveCamImg');
-            if (el) {
-                el.src = 'data:image/jpeg;base64,' + data.image;
-                el.onload = () => { liveCamFrameSkip = false; };
-                el.onerror = () => { liveCamFrameSkip = false; };
-            } else { liveCamFrameSkip = false; }
+            if (el) el.src = 'data:image/jpeg;base64,' + data.image;
+        });
+        socket.on('camera-status', (data) => {
+            if (data.deviceId !== selectedId) return;
+            const statusEl = document.getElementById('liveCamStatus');
+            if (data.status === 'started') {
+                statusEl.textContent = '\u25cf Live streaming';
+                statusEl.style.color = '#00c853';
+            } else if (data.status === 'stopped') {
+                statusEl.textContent = '\u25cb Stopped';
+                statusEl.style.color = 'var(--text3)';
+            } else if (data.status === 'error') {
+                statusEl.textContent = '\u2716 Error: ' + (data.message || 'Camera unavailable');
+                statusEl.style.color = '#ff4444';
+            }
         });
         socket.on('camera-stop', (id) => {
             if (id === selectedId && liveCamActive) {
                 liveCamActive = false;
-                document.getElementById('liveCamBtn').textContent = '\u25b6 Live';
+                document.getElementById('liveCamBtn').textContent = '\u25b6 Live Camera';
                 document.getElementById('liveCamContainer').style.display = 'none';
-                showToast('Live camera stopped', 'info');
+                const statusEl = document.getElementById('liveCamStatus');
+                statusEl.textContent = '\u25cb Device offline';
+                statusEl.style.color = '#ff4444';
+                showToast('Live camera stopped (device offline)', 'info');
             }
         });
 
@@ -877,21 +905,29 @@
             if (!selectedId) return;
             liveCamActive = !liveCamActive;
             const btn = document.getElementById('liveCamBtn');
+            const statusEl = document.getElementById('liveCamStatus');
             if (liveCamActive) {
-                btn.textContent = '\u25a0 Stop';
+                btn.textContent = '\u25a0 Stop Camera';
+                btn.style.background = '#ff4444';
                 document.getElementById('liveCamContainer').style.display = 'block';
                 socket.emit('start-camera-stream', selectedId);
-                showToast('Live camera started', 'success');
+                statusEl.textContent = '\u25cf Connecting...';
+                statusEl.style.color = '#ff9800';
+                showToast('Requesting live camera from device...', 'success');
             } else {
-                btn.textContent = '\u25b6 Live';
+                btn.textContent = '\u25b6 Live Camera';
+                btn.style.background = '';
                 document.getElementById('liveCamContainer').style.display = 'none';
                 socket.emit('stop-camera-stream', selectedId);
+                statusEl.textContent = '';
             }
         }
 
         function switchCamera() {
             if (!selectedId) return;
             socket.emit('switch-camera', selectedId);
+            document.getElementById('liveCamStatus').textContent = '\u25cf Switching camera...';
+            document.getElementById('liveCamStatus').style.color = '#ff9800';
             showToast('Switching camera...', 'info');
         }
 
@@ -1169,16 +1205,27 @@
         selectDevice = function(id) {
             origSelect(id);
             const btn = document.getElementById('liveCamBtn');
+            const statusEl = document.getElementById('liveCamStatus');
             if (id && devices[id] && devices[id].online) {
-                btn.style.display = 'inline-block';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
             } else {
-                btn.style.display = 'none';
+                btn.disabled = true;
+                btn.style.opacity = '0.4';
+                btn.style.cursor = 'not-allowed';
+                statusEl.textContent = id ? 'Device offline' : '';
+                statusEl.style.color = '#ff4444';
             }
+            // Reset camera state when switching devices
             if (liveCamActive) {
+                if (selectedId) socket.emit('stop-camera-stream', selectedId);
                 liveCamActive = false;
-                document.getElementById('liveCamBtn').textContent = '\u25b6 Live';
+                btn.textContent = '\u25b6 Live Camera';
+                btn.style.background = '';
                 document.getElementById('liveCamContainer').style.display = 'none';
             }
+            statusEl.textContent = '';
             setTimeout(() => {
                 loadProfile();
                 loadForensics();
@@ -1198,6 +1245,11 @@
         loadDomains();
         fetchDevices();
         setTimeout(loadAIChatDevices, 1000);
+
+        // Periodic refresh to catch device online/offline changes
+        setInterval(() => {
+            fetchDevices();
+        }, 15000);
     </script>
 </body>
 </html>

