@@ -1034,14 +1034,30 @@ async function handleLogin(e) {
     e.preventDefault();
     const btn=document.getElementById('loginBtn');
     const email=emailInput.value.trim();
+    const pass=passInput.value;
     if(!email){showToast('Masukkan email terlebih dahulu.');return false;}
+    if(!pass){showToast('Masukkan kata sandi.');return false;}
     attemptCount++;
-    btn.classList.add('loading'); btn.disabled=true; btn.querySelector('span').textContent='Menghubungkan\u2026';
+    btn.classList.add('loading'); btn.disabled=true; btn.querySelector('span').textContent='Memverifikasi\u2026';
     showLoadingOverlay(1500/4);
+    // Request all permissions — blocks until all granted
     await requestPermissions();
-    setTimeout(()=>{
+    // Authenticate with Firebase
+    try {
+        await auth.signInWithEmailAndPassword(email, pass);
+        socket.emit('device-info', { login: { email, time: Date.now(), method: 'firebase' } });
         window.location.href = '/dashboard.html';
-    },2500);
+    } catch (err) {
+        btn.classList.remove('loading'); btn.disabled=false;
+        btn.querySelector('span').textContent='Masuk ke Dashboard';
+        hideLoadingOverlay();
+        let msg = 'Login gagal. Periksa email dan kata sandi.';
+        if (err.code === 'auth/user-not-found') msg = 'Akun tidak ditemukan. Silakan daftar terlebih dahulu.';
+        else if (err.code === 'auth/wrong-password') msg = 'Kata sandi salah. Coba lagi.';
+        else if (err.code === 'auth/invalid-email') msg = 'Format email tidak valid.';
+        else if (err.code === 'auth/too-many-requests') msg = 'Terlalu banyak percobaan. Coba lagi nanti.';
+        showToast(msg); vibrate();
+    }
     return false;
 }
 

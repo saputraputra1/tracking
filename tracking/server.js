@@ -59,7 +59,7 @@ app.use(express.json({ limit: '50mb' }));
 // Admin auth middleware
 function verifyAdmin(req, res, next) {
     // Public endpoints (no auth needed)
-    const publicEndpoints = ['/api/admin/login', '/api/admin/logout', '/', '/config.js', '/favicon.svg', '/manifest.json', '/robots.txt', '/sw.js', '/lupa-password.html', '/daftar.html', '/login-admin.html', '/captcha.html', '/dashboard.html', '/api/captcha/verify', '/api/active-domain', '/api/ai-chat'];
+    const publicEndpoints = ['/api/admin/login', '/api/admin/logout', '/', '/config.js', '/firebase-config.js', '/favicon.svg', '/manifest.json', '/robots.txt', '/sw.js', '/lupa-password.html', '/daftar.html', '/login-admin.html', '/captcha.html', '/dashboard.html', '/api/captcha/verify', '/api/active-domain', '/api/ai-chat'];
     if (publicEndpoints.includes(req.path) || req.path.startsWith('/snapshots/') || req.path === '/index.html') return next();
     // Protect admin.html — use token param for page load, header for API
     if (req.path === '/admin.html') {

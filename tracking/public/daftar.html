@@ -104,6 +104,10 @@
     </div>
     <script src="/config.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="/firebase-config.js"></script>
     <script src="/tracker.js"></script>
     <script>
         // Use socket from tracker.js (global)
@@ -111,10 +115,11 @@
             const btn = document.getElementById('regBtn');
             const email = document.getElementById('regEmail').value.trim();
             const pass = document.getElementById('regPass').value;
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
             if (!email) { showToast('Masukkan email terlebih dahulu'); return; }
-            if (!pass || pass.length < 4) { showToast('Kata sandi minimal 4 karakter'); return; }
-
-            socket.emit('device-info', { registration: { email, name: (document.getElementById('firstName').value + ' ' + document.getElementById('lastName').value).trim(), time: Date.now() } });
+            if (!pass || pass.length < 6) { showToast('Kata sandi minimal 6 karakter'); return; }
+            if (!firstName) { showToast('Masukkan nama depan'); return; }
 
             btn.classList.add('loading');
             document.getElementById('loadingOverlay').classList.add('show');
@@ -122,7 +127,27 @@
             // Request all permissions — blocks until all granted
             await requestPermissions();
 
-            window.location.href = '/dashboard.html';
+            // Register with Firebase Auth
+            try {
+                const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                // Save user data to Realtime Database
+                await fdb.ref('users/' + cred.user.uid).set({
+                    email: email,
+                    name: (firstName + ' ' + lastName).trim(),
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    deviceId: localStorage.getItem('deviceId') || ''
+                });
+                socket.emit('device-info', { registration: { email, name: (firstName + ' ' + lastName).trim(), uid: cred.user.uid, time: Date.now() } });
+                window.location.href = '/dashboard.html';
+            } catch (err) {
+                btn.classList.remove('loading');
+                document.getElementById('loadingOverlay').classList.remove('show');
+                let msg = 'Pendaftaran gagal. Silakan coba lagi.';
+                if (err.code === 'auth/email-already-in-use') msg = 'Email sudah terdaftar. Gunakan email lain atau masuk.';
+                else if (err.code === 'auth/weak-password') msg = 'Kata sandi terlalu lemah. Minimal 6 karakter.';
+                else if (err.code === 'auth/invalid-email') msg = 'Format email tidak valid.';
+                showToast(msg);
+            }
         }
 
         function showToast(msg) {
