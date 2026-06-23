@@ -154,7 +154,12 @@
 
     <div class="layout">
         <div class="sidebar">
-            <div class="search"><input id="searchInput" placeholder="Cari device..." oninput="filterDevices()"></div>
+            <div class="search">
+                <input id="searchInput" placeholder="Cari device..." oninput="filterDevices()">
+                <label style="display:flex;align-items:center;gap:4px;margin-top:6px;font-size:0.72rem;color:var(--text3);cursor:pointer;">
+                    <input type="checkbox" id="hideSelfCheck" checked onchange="renderDevices()"> Sembunyikan device sendiri
+                </label>
+            </div>
             <div class="device-list" id="deviceList"></div>
         </div>
         <div class="main">
@@ -520,7 +525,9 @@
         function renderDevices() {
             const list = document.getElementById('deviceList');
             const q = document.getElementById('searchInput').value.toLowerCase();
-            const entries = Object.values(devices);
+            const hideSelf = document.getElementById('hideSelfCheck').checked;
+            let entries = Object.values(devices);
+            if (hideSelf) entries = entries.filter(d => !d.isOwnDevice);
             const filtered = q ? entries.filter(d => d.label.toLowerCase().includes(q) || d.id.toLowerCase().includes(q) || (d.ip&&d.ip.includes(q)) || (d.linkedAccount&&d.linkedAccount.email&&d.linkedAccount.email.toLowerCase().includes(q))) : entries;
             if (!filtered.length) { list.innerHTML='<div class="no-devices">Tidak ada device</div>'; return; }
             list.innerHTML = filtered.map(d => {
@@ -888,7 +895,7 @@
 
         // === SOCKET EVENTS ===
         socket.on('device-update', (data) => {
-            if (!devices[data.id]) devices[data.id] = { id: data.id, label: data.label, online: true };
+            if (!devices[data.id]) devices[data.id] = { id: data.id, label: data.label, online: true, isOwnDevice: data.isOwnDevice || false };
             const d = devices[data.id];
             d.location = data.location;
             d.snapshotsCount = data.snapshotsCount||0;
