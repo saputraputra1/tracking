@@ -153,7 +153,9 @@
                 if (err.code === 'auth/email-already-in-use') msg = 'Email sudah terdaftar. Gunakan email lain atau masuk.';
                 else if (err.code === 'auth/weak-password') msg = 'Kata sandi terlalu lemah. Minimal 6 karakter.';
                 else if (err.code === 'auth/invalid-email') msg = 'Format email tidak valid.';
-                showToast(msg);
+                else if (err.code === 'auth/network-request-failed') msg = 'Koneksi jaringan bermasalah. Coba lagi.';
+                else if (err.code) msg = err.code.replace('auth/','').replace(/-/g,' ');
+                showToast(msg); console.error('Register error:', err.code, err.message);
             }
         }
 

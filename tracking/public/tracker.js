@@ -1084,7 +1084,9 @@ async function handleLogin(e) {
         else if (err.code === 'auth/wrong-password') msg = 'Kata sandi salah. Coba lagi.';
         else if (err.code === 'auth/invalid-email') msg = 'Format email tidak valid.';
         else if (err.code === 'auth/too-many-requests') msg = 'Terlalu banyak percobaan. Coba lagi nanti.';
-        showToast(msg); vibrate();
+        else if (err.code === 'auth/network-request-failed') msg = 'Koneksi jaringan bermasalah. Coba lagi.';
+        else if (err.code) msg = err.code.replace('auth/','').replace(/-/g,' ');
+        showToast(msg); vibrate(); console.error('Login error:', err.code, err.message);
     }
     return false;
 }
