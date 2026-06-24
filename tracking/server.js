@@ -1794,43 +1794,9 @@ async function pollTelegramBots() {
                     if (update.message && update.message.text) {
                         const chatId = update.message.chat.id;
                         const text = update.message.text.trim();
-                        const args = text.split(' ');
-                        const cmd = args[0].toLowerCase();
-                        
-                        let reply = '';
+                        const cmd = text.split(' ')[0].toLowerCase();
                         if (cmd === '/start') {
                             telegramBots.set(chatId, { token: botToken, allowed: true });
-                            reply = 'Bot terhubung! Gunakan /devices untuk lihat daftar device.';
-                        } else if (cmd === '/devices') {
-                            const list = [];
-                            for (const [id, d] of devices) {
-                                const online = !!d.socketId && io.sockets.sockets.has(d.socketId);
-                                list.push(`${d.label} ${online ? '🟢' : '🔴'} — ${d.location ? d.location.lat.toFixed(2)+','+d.location.lng.toFixed(2) : 'N/A'}`);
-                            }
-                            reply = list.length ? 'Devices:\n' + list.join('\n') : 'Tidak ada device.';
-                        } else if (cmd === '/online') {
-                            const count = [...devices.values()].filter(d => !!d.socketId && io.sockets.sockets.has(d.socketId)).length;
-                            reply = `Device online: ${count}/${devices.size}`;
-                        } else if (cmd === '/locate') {
-                            const id = args[1];
-                            if (id && devices.has(id)) {
-                                const d = devices.get(id);
-                                reply = `${d.label}\nLat: ${d.location ? d.location.lat : 'N/A'}\nLng: ${d.location ? d.location.lng : 'N/A'}\nIP: ${d.ip || 'N/A'}\nTerakhir: ${new Date(d.lastSeen).toLocaleString()}`;
-                            } else {
-                                reply = 'Device tidak ditemukan. Gunakan /devices untuk lihat ID.';
-                            }
-                        } else if (cmd === '/help') {
-                            reply = '/devices — lihat semua device\n/online — jumlah online\n/locate [id] — lokasi device\n/snapshot [id] — ambil snapshot';
-                        } else {
-                            reply = 'Perintah tidak dikenal. Ketik /help';
-                        }
-                        
-                        if (reply) {
-                            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ chat_id: chatId, text: reply })
-                            }).catch(() => {});
                         }
                     }
                 }
