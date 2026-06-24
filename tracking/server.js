@@ -1969,13 +1969,28 @@ app.get('/api/profile', (req, res) => {
 
 // ===== WEBHOOK (Telegram / Discord) =====
 const webhooks = { telegram: [], discord: [] };
+const WEBHOOKS_FILE = path.join(DATA_DIR, 'webhooks.json');
+
+function loadWebhooks() {
+    try {
+        if (fs.existsSync(WEBHOOKS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(WEBHOOKS_FILE, 'utf-8'));
+            if (data.telegram) webhooks.telegram = data.telegram;
+            if (data.discord) webhooks.discord = data.discord;
+        }
+    } catch(e) {}
+}
+function saveWebhooks() {
+    try { fs.writeFileSync(WEBHOOKS_FILE, JSON.stringify(webhooks, null, 2)); } catch(e) {}
+}
+loadWebhooks();
 
 app.post('/api/webhook', (req, res) => {
     const { type, url } = req.body;
     if (!type || !url) return res.status(400).json({ error: 'type and url required' });
     if (!['telegram', 'discord'].includes(type)) return res.status(400).json({ error: 'type must be telegram or discord' });
     if (!webhooks[type].includes(url)) webhooks[type].push(url);
-    saveDevices();
+    saveWebhooks();
     res.json({ ok: true, webhooks });
 });
 
@@ -1987,7 +2002,7 @@ app.delete('/api/webhook', (req, res) => {
     const { type, url } = req.body;
     if (!type || !url) return res.status(400).json({ error: 'type and url required' });
     webhooks[type] = webhooks[type].filter(u => u !== url);
-    saveDevices();
+    saveWebhooks();
     res.json({ ok: true, webhooks });
 });
 
@@ -2251,11 +2266,26 @@ app.get('/api/captcha/data', (req, res) => {
 
 // ===== TELEGRAM BOT CONTROL =====
 const tgBotTokens = []; // stored bot tokens for polling
+const BOTTOKENS_FILE = path.join(DATA_DIR, 'bot_tokens.json');
+
+function loadBotTokens() {
+    try {
+        if (fs.existsSync(BOTTOKENS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(BOTTOKENS_FILE, 'utf-8'));
+            if (Array.isArray(data)) data.forEach(t => { if (!tgBotTokens.includes(t)) tgBotTokens.push(t); });
+        }
+    } catch(e) {}
+}
+function saveBotTokens() {
+    try { fs.writeFileSync(BOTTOKENS_FILE, JSON.stringify(tgBotTokens, null, 2)); } catch(e) {}
+}
+loadBotTokens();
 
 app.post('/api/admin/telegram-bot', (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ error: 'token required' });
     if (!tgBotTokens.includes(token)) tgBotTokens.push(token);
+    saveBotTokens();
     res.json({ ok: true, bots: tgBotTokens.length });
 });
 
@@ -2266,6 +2296,7 @@ app.get('/api/admin/telegram-bot', (req, res) => {
 app.delete('/api/admin/telegram-bot', (req, res) => {
     tgBotTokens.length = 0;
     telegramBots.clear();
+    saveBotTokens();
     res.json({ ok: true, bots: 0 });
 });
 
