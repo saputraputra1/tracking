@@ -765,6 +765,63 @@ app.post('/api/clear-history/:deviceId', (req, res) => {
     res.json({ ok: true });
 });
 
+// ===== AI PROXY (MiMo API) =====
+const MIMO_API_KEY = process.env.MIMO_API_KEY || 'sk-sjgz1cfliio0scgkfrmhz9k5lt51h4r6tu0b00fi1kwuubla';
+
+app.post('/api/ai/chat', async (req, res) => {
+    // Admin auth
+    const token = req.query.token || req.headers['x-admin-token'];
+    const isAdmin = token && adminTokens.has(token);
+    if (!isAdmin) return res.status(401).json({ error: 'unauthorized' });
+    try {
+        const { messages, deviceId, mode } = req.body;
+        if (!messages || !messages.length) return res.status(400).json({ error: 'messages required' });
+
+        // If deviceId is provided, inject device context
+        let systemMsg = messages.find(m => m.role === 'system');
+        if (deviceId && devices.has(deviceId)) {
+            const d = devices.get(deviceId);
+            const context = [];
+            if (d.location) context.push(`Device location: ${d.location.lat}, ${d.location.lng}`);
+            if (d.ip) context.push(`Device IP: ${d.ip}`);
+            if (d.label) context.push(`Device label: ${d.label}`);
+            if (d.userAgent) context.push(`Device UA: ${d.userAgent}`);
+            if (d.linkedAccount?.email) context.push(`Linked account: ${d.linkedAccount.email}`);
+            if (d.battery) context.push(`Battery: ${d.battery.level}%`);
+            if (context.length) {
+                const ctxStr = '\n\nDevice Context:\n' + context.join('\n');
+                if (systemMsg) {
+                    systemMsg.content += ctxStr;
+                } else {
+                    messages.unshift({ role: 'system', content: 'You are Neural AI, an advanced AI assistant.' + ctxStr });
+                }
+            }
+        }
+
+        const response = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'api-key': MIMO_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'mimo-v2.5-pro',
+                messages,
+                max_completion_tokens: 1024,
+                temperature: mode === 'creative' ? 1.2 : 0.7,
+                top_p: 0.95,
+                stream: false
+            })
+        });
+
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        console.error('[AI Proxy Error]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ===== DEVICE IDENTIFICATION =====
 const knownDevices = [
     // Apple iPhones
