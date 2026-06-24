@@ -796,11 +796,7 @@ app.post('/api/heartbeat', (req, res) => {
 });
 
 app.post('/api/sw-heartbeat', (req, res) => {
-    // Service Worker keepalive pong
     res.json({ ok: true, time: Date.now() });
-});
-    // Handle beacon requests (may not get response)
-    res.status(204).send();
 });
 
 app.post('/api/background-sync', (req, res) => {
