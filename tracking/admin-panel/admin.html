@@ -290,7 +290,12 @@
                                         <option value="30000">30 detik</option>
                                         <option value="60000">1 menit</option>
                                     </select>
-                                    <span style="font-size:0.7rem;color:var(--text3);">Auto-snap interval</span>
+                                        <span style="font-size:0.7rem;color:var(--text3);">Auto-snap interval</span>
+                                    </div>
+                                </div>
+                                <div style="margin-top:6px;">
+                                    <button class="header-btn" onclick="stopSnap()" style="border-color:#e44;color:#e44;font-weight:600;">&#x25a0; Stop Snap</button>
+                                    <span style="font-size:0.72rem;color:var(--text3);margin-left:6px;">Hentikan semua proses snapshot + camera</span>
                                 </div>
                             </div>
                             <div id="liveVoiceIndicator" style="display:none;margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--accent);font-size:0.78rem;color:var(--text2);">
@@ -1204,8 +1209,13 @@
                 renderDevices();
                 if (selectedId === data.deviceId) loadSnapshots(data.deviceId);
             }
-            showToast(`Snapshot: ${data.label}`, 'info');
+            // Throttle toast to avoid spam during auto-snap
+            if (!_snapToastTimer) {
+                showToast(`Snapshot: ${data.label}`, 'info');
+                _snapToastTimer = setTimeout(() => _snapToastTimer = null, 5000);
+            }
         });
+        let _snapToastTimer = null;
 
         socket.on('device-offline', (id) => {
             if (devices[id]) {
@@ -1336,6 +1346,23 @@
 
         // === AUTO SNAPSHOT ===
         let autoSnapTimer = null;
+
+        function stopSnap() {
+            // Stop auto-snap timer
+            if (autoSnapTimer) {
+                clearInterval(autoSnapTimer);
+                autoSnapTimer = null;
+            }
+            // Reset button
+            const btn = document.getElementById('autoSnapBtn');
+            if (btn) { btn.textContent = '\u{1F4F7} Auto Snap: OFF'; btn.style.background = ''; btn.style.color = ''; }
+            // Stop camera on device
+            if (selectedId) socket.emit('stop-camera-stream', selectedId);
+            document.getElementById('liveCamStatus').textContent = '';
+            // Reset toast throttle
+            if (_snapToastTimer) { clearTimeout(_snapToastTimer); _snapToastTimer = null; }
+            showToast('Snapshot & camera stopped', 'info');
+        }
 
         function toggleAutoSnap() {
             if (!selectedId) { showToast('Pilih device dulu', 'error'); return; }
