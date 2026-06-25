@@ -29,9 +29,6 @@
                 return;
             }
             window._adminToken = token;
-            // Detect reseller mode from path /r/:resellerId/admin.html
-            const pathMatch = window.location.pathname.match(/^\/r\/([^/]+)\//);
-            window._resellerId = pathMatch ? pathMatch[1] : '';
             // Intercept fetch to auto-inject token header
             const origFetch = window.fetch;
             window.fetch = function(url, opts) {
